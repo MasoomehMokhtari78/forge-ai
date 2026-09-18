@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     chunk_size: int = 50
     chunk_overlap: int = 10
 
+    # RAG & Retrieval configuration
+    rag_top_k: int = 5
+    rag_max_context_chars: int = 4000
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
