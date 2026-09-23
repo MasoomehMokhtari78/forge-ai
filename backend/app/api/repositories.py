@@ -13,8 +13,17 @@ from app.core.database import get_db
 from app.models.code_chunk import CodeChunk
 from app.models.code_file import CodeFile
 from app.models.repository import Repository
+from app.schemas.agent import AgentRequest, AgentResponse
 from app.schemas.indexing import IndexingResponse, IndexSummaryResponse
+from app.schemas.rag import (
+    ChatRequest,
+    ChatResponse,
+    SearchRequest,
+    SearchResponse,
+)
 from app.schemas.repository import RepositoryCreate, RepositoryResponse
+from app.services.agent import AgentService, get_default_agent_service
+from app.services.rag import RAGService, get_default_rag_service
 from app.services.repository_indexing import (
     IndexingError,
     RepositoryFilesNotAvailableError,
@@ -27,6 +36,11 @@ from app.services.repository_ingestion import (
     RepositoryIngestionService,
 )
 from app.services.repository_url import InvalidRepositoryURLError
+from app.services.retrieval import (
+    RepositoryNotFoundError as RetrievalRepoNotFoundError,
+    RepositoryNotReadyForSearchError,
+    RetrievalService,
+)
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 
@@ -184,4 +198,127 @@ async def get_repository_index_summary(
         files_indexed=files_count,
         chunks_created=chunks_count,
     )
+
+
+# ===========================================================================
+# Retrieval & RAG Endpoints
+# ===========================================================================
+
+def get_retrieval_service() -> RetrievalService:
+    return RetrievalService()
+
+
+def get_rag_service() -> RAGService:
+    return get_default_rag_service()
+
+
+@router.post(
+    "/{repository_id}/search",
+    response_model=SearchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Semantic code search within a repository",
+    description="Performs pgvector cosine similarity search to retrieve relevant code chunks with repository isolation.",
+)
+async def search_repository(
+    repository_id: UUID,
+    payload: SearchRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+) -> SearchResponse:
+    try:
+        results = await service.search(
+            repository_id=repository_id,
+            query=payload.query,
+            db=db,
+            top_k=payload.top_k,
+            similarity_threshold=payload.similarity_threshold,
+        )
+        return SearchResponse(
+            repository_id=repository_id,
+            query=payload.query,
+            results=results,
+        )
+    except RetrievalRepoNotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+    except RepositoryNotReadyForSearchError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+
+@router.post(
+    "/{repository_id}/chat",
+    response_model=ChatResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Ask questions about repository code (RAG)",
+    description="Retrieves relevant code chunks, packs budgeted context, and generates an answer with authoritative citations.",
+)
+async def chat_repository(
+    repository_id: UUID,
+    payload: ChatRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[RAGService, Depends(get_rag_service)],
+) -> ChatResponse:
+    try:
+        return await service.answer_question(
+            repository_id=repository_id,
+            question=payload.question,
+            db=db,
+        )
+    except RetrievalRepoNotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+    except RepositoryNotReadyForSearchError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+
+# ===========================================================================
+# Agent Endpoint
+# ===========================================================================
+
+def get_agent_service() -> AgentService:
+    return get_default_agent_service()
+
+
+@router.post(
+    "/{repository_id}/agent",
+    response_model=AgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Investigate repository code with bounded read-only agent",
+    description="Iteratively uses read-only tools (search, read file, list files) to investigate a question and formulate an answer with authoritative citations.",
+)
+async def run_agent(
+    repository_id: UUID,
+    payload: AgentRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[AgentService, Depends(get_agent_service)],
+) -> AgentResponse:
+    try:
+        return await service.run(
+            repository_id=repository_id,
+            question=payload.question,
+            db=db,
+            max_iterations=payload.max_iterations,
+        )
+    except RetrievalRepoNotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+    except RepositoryNotReadyForSearchError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+
 
