@@ -17,6 +17,7 @@ dependencies = [
     "psycopg[binary]",
     "pgvector>=0.3.0",
     "sentence-transformers>=3.0.0",
+    "google-genai>=0.1.1",
 ]
 
 [project.optional-dependencies]

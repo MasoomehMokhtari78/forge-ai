@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.models.code_chunk import CodeChunk
 from app.models.code_file import CodeFile
 from app.models.repository import Repository
+from app.schemas.agent import AgentRequest, AgentResponse
 from app.schemas.indexing import IndexingResponse, IndexSummaryResponse
 from app.schemas.rag import (
     ChatRequest,
@@ -21,6 +22,7 @@ from app.schemas.rag import (
     SearchResponse,
 )
 from app.schemas.repository import RepositoryCreate, RepositoryResponse
+from app.services.agent import AgentService, get_default_agent_service
 from app.services.rag import RAGService, get_default_rag_service
 from app.services.repository_indexing import (
     IndexingError,
@@ -277,5 +279,46 @@ async def chat_repository(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(err),
         ) from err
+
+
+# ===========================================================================
+# Agent Endpoint
+# ===========================================================================
+
+def get_agent_service() -> AgentService:
+    return get_default_agent_service()
+
+
+@router.post(
+    "/{repository_id}/agent",
+    response_model=AgentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Investigate repository code with bounded read-only agent",
+    description="Iteratively uses read-only tools (search, read file, list files) to investigate a question and formulate an answer with authoritative citations.",
+)
+async def run_agent(
+    repository_id: UUID,
+    payload: AgentRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[AgentService, Depends(get_agent_service)],
+) -> AgentResponse:
+    try:
+        return await service.run(
+            repository_id=repository_id,
+            question=payload.question,
+            db=db,
+            max_iterations=payload.max_iterations,
+        )
+    except RetrievalRepoNotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+    except RepositoryNotReadyForSearchError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
 
 

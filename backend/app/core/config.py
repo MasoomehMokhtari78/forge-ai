@@ -27,6 +27,19 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     rag_max_context_chars: int = 4000
 
+    # Agent configuration
+    agent_max_iterations: int = 8
+    agent_max_tool_calls: int = 12
+    agent_max_context_chars: int = 12000
+    agent_max_file_read_lines: int = 500
+
+    # LLM & Agent Provider
+    llm_provider: str = "mock"  # "mock", "ollama", or "gemini"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.6-flash"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5-coder:7b"
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
