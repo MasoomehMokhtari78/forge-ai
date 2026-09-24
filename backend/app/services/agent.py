@@ -86,6 +86,22 @@ class AgentService:
         )
         return any(phrase in lowered for phrase in key_phrases)
 
+    @staticmethod
+    def _is_recoverable_path_error(error_msg: str) -> bool:
+        """Determine whether a tool failure is a recoverable path/file resolution error."""
+        lowered = error_msg.lower()
+        return any(
+            cue in lowered
+            for cue in (
+                "not found",
+                "no such file",
+                "does not exist",
+                "not a regular file",
+                "not a directory",
+                "forbidden",
+            )
+        )
+
     async def validate_repository_readiness(
         self,
         repository_id: UUID,
@@ -208,7 +224,11 @@ class AgentService:
                     if last_obs.get("success"):
                         obs_payload = json.dumps(last_obs.get("data", {}))
                     else:
-                        obs_payload = json.dumps({"error": last_obs.get("error", "Tool execution failed")})
+                        err_dict: dict[str, Any] = {"error": last_obs.get("error", "Tool execution failed")}
+                        obs_data = last_obs.get("data")
+                        if isinstance(obs_data, dict) and obs_data.get("recovery_guidance"):
+                            err_dict["recovery_guidance"] = obs_data["recovery_guidance"]
+                        obs_payload = json.dumps(err_dict)
 
                     tool_msg_parts.append(
                         AgentMessage(
@@ -470,19 +490,29 @@ class AgentService:
                 )
 
         except (ValidationError, ToolExecutionError) as err:
-            logger.info("Tool %s execution controlled error: %s", tool.value, err)
+            err_msg = str(err)
+            logger.info("Tool %s execution controlled error: %s", tool.value, err_msg)
             state.record_activity(
                 tool=tool,
                 parameters=arguments,
                 success=False,
-                summary=f"Tool failed: {err}",
+                summary=f"Tool failed: {err_msg}",
             )
+            recovery_guidance = None
+            if self._is_recoverable_path_error(err_msg):
+                recovery_guidance = (
+                    "The requested path was not found. This does NOT mean the requested information is "
+                    "unavailable in the repository. Do not invent filenames blindly or conclude evidence is "
+                    "unavailable. Use 'list_files' to discover directory contents or 'search_code' to search "
+                    "for relevant keywords and locate the correct file path."
+                )
+
             state.record_observation(
                 tool=tool,
                 arguments=arguments,
                 success=False,
-                data=None,
-                error=str(err),
+                data={"recovery_guidance": recovery_guidance} if recovery_guidance else None,
+                error=err_msg,
             )
         except Exception as exc:
             logger.exception("Unexpected error executing tool %s: %s", tool.value, exc)

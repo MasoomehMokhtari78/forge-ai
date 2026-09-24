@@ -1,0 +1,117 @@
+{
+  "version": "1.1",
+  "description": "ForgeAI Agent behavioral evaluation suite for repository-based software engineering investigation.",
+  "cases": [
+    {
+      "id": "repo-purpose",
+      "name": "Repository Purpose Overview",
+      "question": "Explain the overall purpose of this repository. Use repository files to identify what types of files it contains, and cite relevant sources.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "answer_contains": ["gitignore"]
+      }
+    },
+    {
+      "id": "repo-structure",
+      "name": "Repository Structure Discovery",
+      "question": "How is this repository structured and organized at the root directory level? List the files and describe what you observe.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "required_tools": ["list_files"],
+        "answer_contains": ["gitignore"]
+      }
+    },
+    {
+      "id": "joomla-file-contents",
+      "name": "Specific File Inspection (Joomla.gitignore)",
+      "question": "What specific file patterns and rules are configured in Joomla.gitignore?",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "required_tools": ["read_file"],
+        "answer_contains": ["joomla"]
+      }
+    },
+    {
+      "id": "joomla-template-distinction",
+      "name": "Evidence Distinction (Template vs Application)",
+      "question": "Is this repository itself a Joomla web application codebase, or does it merely contain a Joomla gitignore template? Explain based strictly on repository evidence.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1
+      }
+    },
+    {
+      "id": "search-code-crash-logs",
+      "name": "Search-Required Code Investigation",
+      "question": "Use code search to find which gitignore files in this repository contain patterns for ignoring crash logs or log files, and cite the files found.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "required_tools": ["search_code"],
+        "answer_contains": ["log"]
+      }
+    },
+    {
+      "id": "read-file-python-patterns",
+      "name": "Read-File Content Inspection (Python.gitignore)",
+      "question": "Read Python.gitignore and explain what bytecode, cache, and virtual environment directory patterns are excluded.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "required_tools": ["read_file"],
+        "answer_contains": ["python"]
+      }
+    },
+    {
+      "id": "grounding-makefile-check",
+      "name": "Grounding Requirement (Absence of Makefile)",
+      "question": "Does this repository include a custom Makefile for building C/C++ binary targets? Verify using repository evidence before answering.",
+      "checks": {
+        "must_be_completed": true,
+        "min_tool_calls": 1
+      }
+    },
+    {
+      "id": "multistep-language-comparison",
+      "name": "Multi-Step Multi-File Investigation",
+      "question": "Identify three different programming language templates in this repository (e.g. Java, Python, C++), inspect their contents, and compare the types of build artifacts they ignore.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1
+      }
+    },
+    {
+      "id": "node-gitignore-rules",
+      "name": "Repository-Specific Factual Rules (Node.gitignore)",
+      "question": "What specific rules and comments are defined in Node.gitignore regarding node_modules, logs, and environment files?",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 1,
+        "required_tools": ["read_file"],
+        "answer_contains": ["node"]
+      }
+    },
+    {
+      "id": "tool-use-cpp-inspection",
+      "name": "Sequential Discovery & Inspection (C++.gitignore)",
+      "question": "List the root files to confirm C++.gitignore exists, then read C++.gitignore and cite the object file extensions it excludes.",
+      "checks": {
+        "must_be_completed": true,
+        "min_sources": 1,
+        "min_tool_calls": 2,
+        "required_tools": ["list_files", "read_file"]
+      }
+    }
+  ]
+}
