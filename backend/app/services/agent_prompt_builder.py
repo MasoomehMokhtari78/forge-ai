@@ -38,6 +38,7 @@ class AgentPromptBuilder:
         "- Use 'list_files' or 'search_code' to locate relevant files.\n"
         "- Before finalizing any answer about repository purpose, architecture, implementation, behavior, dependencies, configuration, or workflows, you MUST inspect relevant file contents using 'read_file' or 'search_code'.\n"
         "- In your final answer, cite the verified source IDs (e.g. src_1, src_2) for every repository-specific claim. A file path alone is only a navigation hint; only src_X represents verified evidence.\n"
+        "- Error Recovery: If a tool returns 'File not found' or 'Directory not found', this does not mean the information is missing from the repository. Immediately use 'list_files' or 'search_code' to discover the actual repository layout and locate the correct file path before concluding evidence is unavailable. Never assume a file does not exist after a single failed path guess.\n"
         "- If the repository does not contain enough evidence to answer the question, explicitly state that available repository evidence is insufficient rather than fabricating or guessing."
     )
 
@@ -65,7 +66,10 @@ class AgentPromptBuilder:
                 block = f"Iteration {iter_num}: Tool '{tool_name}' with args {args_str} succeeded:\n{data_str}"
             else:
                 err_msg = obs.get("error", "Unknown error")
-                block = f"Iteration {iter_num}: Tool '{tool_name}' with args {args_str} failed:\nError: {err_msg}"
+                obs_data = obs.get("data")
+                guidance = obs_data.get("recovery_guidance") if isinstance(obs_data, dict) else None
+                guidance_str = f"\nGuidance: {guidance}" if guidance else ""
+                block = f"Iteration {iter_num}: Tool '{tool_name}' with args {args_str} failed:\nError: {err_msg}{guidance_str}"
 
             history_blocks.append(block)
 
