@@ -45,9 +45,20 @@ from app.services.retrieval import (
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 
 
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+from app.models.repository import IngestionStatus, Repository
+
 # Dependency to provide the ingestion service
 def get_ingestion_service() -> RepositoryIngestionService:
     return RepositoryIngestionService()
+
+
+def get_indexing_service() -> RepositoryIndexingService:
+    return RepositoryIndexingService()
 
 
 @router.post(
@@ -55,15 +66,25 @@ def get_ingestion_service() -> RepositoryIngestionService:
     response_model=RepositoryResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Ingest a public GitHub repository",
-    description="Validates the URL, creates a repository record, clones it locally, and discovers source files.",
+    description="Validates the URL, creates a repository record, clones it locally, discovers source files, and automatically indexes chunks/embeddings.",
 )
 async def ingest_repository(
     payload: RepositoryCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[RepositoryIngestionService, Depends(get_ingestion_service)],
+    indexing_service: Annotated[RepositoryIndexingService, Depends(get_indexing_service)],
 ) -> Repository:
     try:
         repo, _discovered_files = await service.ingest(raw_url=payload.url, db=db)
+        if payload.auto_index and repo.status == IngestionStatus.COMPLETED:
+            try:
+                storage_root = getattr(service.cloner, "storage_root", None)
+                if storage_root is not None:
+                    indexing_service.storage_root = Path(storage_root).resolve()
+                await indexing_service.index_repository(repository_id=repo.id, db=db)
+                logger.info("Automatic indexing completed for repository %s", repo.id)
+            except Exception as idx_err:
+                logger.warning("Automatic indexing for repository %s deferred or failed: %s", repo.id, idx_err)
         return repo
     except InvalidRepositoryURLError as err:
         raise HTTPException(
@@ -96,6 +117,28 @@ async def get_repository(
     return repo
 
 
+@router.delete(
+    "/{repository_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a repository",
+    description="Deletes repository metadata, cascade-deletes indexed files, chunks, and cleans up local storage.",
+)
+async def delete_repository(
+    repository_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[RepositoryIngestionService, Depends(get_ingestion_service)],
+) -> None:
+    repo = await db.get(Repository, repository_id)
+    if repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with ID '{repository_id}' not found.",
+        )
+    service.cloner.cleanup(repository_id)
+    await db.delete(repo)
+    await db.commit()
+
+
 @router.get(
     "",
     response_model=list[RepositoryResponse],
@@ -113,9 +156,6 @@ async def list_repositories(
 # ===========================================================================
 # Indexing Endpoints
 # ===========================================================================
-
-def get_indexing_service() -> RepositoryIndexingService:
-    return RepositoryIndexingService()
 
 
 @router.post(
