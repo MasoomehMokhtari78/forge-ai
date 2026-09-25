@@ -320,8 +320,8 @@ Programmatic Citation Verification:
 | **Local LLM Inference** | [Ollama](https://ollama.ai/) (`Qwen2.5-Coder 7B`) | Local LLM for function-calling and agent reasoning |
 | **Testing & CI** | [pytest](https://pytest.org/) & `MockAgentLLMService` | 188 deterministic tests without external API dependencies |
 | **Evaluation** | Custom Behavioral Evaluation Harness | 10-case behavioral evaluation suite |
-| **Containerization** | [Docker Compose](https://docs.docker.com/compose/) | Isolated PostgreSQL + pgvector service |
-| **Frontend** | [Next.js](https://nextjs.org/) | *Planned for next development phase* |
+| **Containerization** | [Docker Compose](https://docs.docker.com/compose/) | Full-stack orchestration (PostgreSQL, FastAPI backend, Next.js frontend) |
+| **Frontend** | [Next.js](https://nextjs.org/) + TypeScript + Tailwind + shadcn/ui | Developer-tool application shell |
 
 ---
 
@@ -329,10 +329,10 @@ Programmatic Citation Verification:
 
 ### Prerequisites
 
-* **Python 3.10+**
-* **Docker & Docker Compose** (for PostgreSQL + pgvector)
+* **Docker & Docker Compose** (for running the full stack)
+* **Ollama** installed and running on the host machine (not containerized, providing direct GPU access)
 * **Git** installed on your system PATH
-* **Ollama** installed and running locally
+* *(Optional for local host testing)* **Python 3.10+**
 
 ### 1. Clone the Repository
 
@@ -341,102 +341,81 @@ git clone https://github.com/MasoomehMokhtari78/forge-ai.git
 cd forge-ai
 ```
 
-### 2. Start PostgreSQL with pgvector
+### 2. Set Up Local Ollama Model (Host Machine)
+
+ForgeAI connects to Ollama running on your **host machine** (accessible to containers via `host.docker.internal:11434`):
 
 ```bash
-docker compose up -d
-```
-
-Verify that PostgreSQL is healthy:
-```bash
-docker compose ps
-```
-
-### 3. Set Up Local Ollama Model
-
-Ensure Ollama is running, then pull the recommended code model:
-```bash
+# Pull the recommended model if you haven't already
 ollama pull qwen2.5-coder:7b
+
+# Ensure Ollama is running
+ollama run qwen2.5-coder:7b
 ```
 
-### 4. Configure Environment
+### 3. Configure Environment
 
-Create your `.env` file from the provided example:
+Create your `.env` file from the provided example if you need custom credentials:
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-The default `.env` is configured for local execution:
-```ini
-DATABASE_URL=postgresql+psycopg://forgeai:forgeai@localhost:5432/forgeai
-TEST_DATABASE_URL=postgresql+psycopg://forgeai:forgeai@localhost:5432/forgeai_test
-REPOSITORY_STORAGE_PATH=./data/repositories
+> **Note on Network Architecture:**
+> * Docker Compose automatically injects `DATABASE_URL=postgresql+psycopg://forgeai:forgeai@postgres:5432/forgeai` and `OLLAMA_BASE_URL=http://host.docker.internal:11434` into the backend container.
+> * If running scripts or tests directly on the host machine, the default `.env` points to `localhost:5432` and `http://localhost:11434`.
 
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-EMBEDDING_DIMENSION=384
-EMBEDDING_DEVICE=auto
+### 4. Start Full-Stack Environment
 
-LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5-coder:7b
-```
-
-### 5. Create Virtual Environment & Install Dependencies
-
-The project uses a root-level virtual environment:
+Start the database, FastAPI backend, and Next.js frontend with a single command:
 
 ```bash
-# Create virtual environment at repository root
-python -m venv .venv
-
-# Activate virtual environment
-# On Linux/macOS:
-source .venv/bin/activate
-# On Windows:
-.venv\Scripts\activate
-
-# Install backend package with development dependencies
-pip install -e "./backend[dev]"
+docker compose up --build
 ```
 
-### 6. Run Database Migrations
+Verify that all three services are running:
+```bash
+docker compose ps
+```
 
-From the `backend` directory (with the root `.venv` active):
+### 5. Access Local Services
+
+Once started, the services are available at:
+
+* **Frontend:** [http://localhost:3000](http://localhost:3000)
+* **Backend API:** [http://localhost:8000](http://localhost:8000)
+* **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+---
+
+### Development & Testing
+
+#### Database Migrations
+Migrations are managed with Alembic. When needed, run from the backend:
 ```bash
 cd backend
 alembic upgrade head
 ```
 
-### 7. Run Deterministic Test Suite
-
+#### Running Tests
 To run tests against the dedicated test database, initialize it once in Docker:
 ```bash
 docker compose exec postgres createdb -U forgeai forgeai_test
 ```
 
-Then run pytest:
+Then run pytest from the `backend/` directory:
 ```bash
+cd backend
 pytest
 ```
 *Expected: 188 passed, 1 skipped.*
 
-### 8. Run the Behavioral Evaluation Harness
-
-With Ollama running `qwen2.5-coder:7b` and an ingested repository ready:
+#### Running the Behavioral Evaluation Harness
+With Ollama running `qwen2.5-coder:7b` on the host:
 ```bash
+cd backend
 python -m evals.run_agent_eval
 ```
-*Outputs a detailed case-by-case report and writes summary JSON to `backend/evals/results/latest.json`.*
-
-### 9. Start the Backend API
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-The interactive OpenAPI documentation will be available at:
-* **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-* **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ---
 

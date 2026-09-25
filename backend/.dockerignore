@@ -1,0 +1,9 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+data/repositories
+forgeai_backend.egg-info
+.git

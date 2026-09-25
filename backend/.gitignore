@@ -26,3 +26,6 @@ htmlcov/
 # IDE
 .idea/
 .vscode/
+
+# Cloned repositories and runtime data
+data/

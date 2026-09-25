@@ -2,15 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies first for better caching
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies: install CPU-only PyTorch first (~180MB) to avoid downloading ~3.5GB CUDA wheels
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir .
 
-# Copy the application code
-COPY ./app /app/app
+# Copy application code
+COPY . /app
 
-# Expose the port the app runs on
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

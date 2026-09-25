@@ -18,6 +18,10 @@ class RepositoryCreate(BaseModel):
         description="Public GitHub repository URL (e.g. https://github.com/owner/repo)",
         examples=["https://github.com/fastapi/fastapi"],
     )
+    auto_index: bool = Field(
+        default=True,
+        description="Automatically index source code chunks and generate vector embeddings after ingestion.",
+    )
 
 
 class RepositoryResponse(BaseModel):
