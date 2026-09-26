@@ -6,6 +6,8 @@ import type {
   IndexingResponse,
   RepositoryFilesResponse,
   FileContentResponse,
+  SearchRequest,
+  SearchResponse,
 } from "./types";
 
 export const repositoriesApi = {
@@ -63,5 +65,11 @@ export const repositoriesApi = {
       .join("/");
     return apiClient.get<FileContentResponse>(`/repositories/${id}/files/${encodedPath}`);
   },
+
+  /**
+   * Perform semantic vector search for code chunks matching the query.
+   */
+  search: (id: string, payload: SearchRequest): Promise<SearchResponse> =>
+    apiClient.post<SearchResponse>(`/repositories/${id}/search`, payload),
 };
 

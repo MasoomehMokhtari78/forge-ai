@@ -24,7 +24,7 @@ test.describe("Repository Workspace", () => {
     // Workspace panels
     await expect(page.getByTestId("workspace-file-sidebar")).toBeVisible();
     await expect(page.getByPlaceholder("Search files...")).toBeVisible();
-    await expect(page.getByText("AI Assistant", { exact: false })).toBeVisible();
+    await expect(page.getByTestId("workspace-search-sidebar")).toBeVisible();
   });
 
   test("navigates back to repositories list from workspace breadcrumb", async ({ page }) => {

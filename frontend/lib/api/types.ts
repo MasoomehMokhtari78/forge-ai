@@ -57,3 +57,25 @@ export interface FileContentResponse {
   size_bytes: number;
   content: string;
 }
+
+export interface ChunkRetrievalResult {
+  chunk_id: string;
+  file_id: string;
+  path: string;
+  content: string;
+  start_line: number;
+  end_line: number;
+  similarity: number;
+}
+
+export interface SearchRequest {
+  query: string;
+  top_k?: number;
+  similarity_threshold?: number | null;
+}
+
+export interface SearchResponse {
+  repository_id: string;
+  query: string;
+  results: ChunkRetrievalResult[];
+}
