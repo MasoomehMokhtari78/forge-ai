@@ -21,7 +21,15 @@ from app.schemas.rag import (
     SearchRequest,
     SearchResponse,
 )
-from app.schemas.repository import RepositoryCreate, RepositoryResponse
+from app.core.config import settings
+from app.schemas.repository import (
+    FileContentResponse,
+    FileMetadata,
+    RepositoryCreate,
+    RepositoryFilesResponse,
+    RepositoryResponse,
+)
+from app.services.repository_files import discover_repository_files
 from app.services.agent import AgentService, get_default_agent_service
 from app.services.rag import RAGService, get_default_rag_service
 from app.services.repository_indexing import (
@@ -151,6 +159,174 @@ async def list_repositories(
     query = select(Repository).order_by(Repository.created_at.desc())
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+# ===========================================================================
+# File Explorer Endpoints
+# ===========================================================================
+
+
+@router.get(
+    "/{repository_id}/files",
+    response_model=RepositoryFilesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List repository files",
+    description="Returns list of files with relative path, extension, and size in bytes.",
+)
+async def list_repository_files(
+    repository_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RepositoryFilesResponse:
+    repo = await db.get(Repository, repository_id)
+    if repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with ID '{repository_id}' not found.",
+        )
+
+    # 1. First check if files are stored in PostgreSQL CodeFile table
+    query = (
+        select(CodeFile)
+        .where(CodeFile.repository_id == repository_id)
+        .order_by(CodeFile.path.asc())
+    )
+    result = await db.execute(query)
+    code_files = list(result.scalars().all())
+    if code_files:
+        return RepositoryFilesResponse(
+            repository_id=repository_id,
+            total_files=len(code_files),
+            files=[
+                FileMetadata(
+                    path=f.path,
+                    size_bytes=f.size_bytes,
+                    extension=f.extension,
+                )
+                for f in code_files
+            ],
+        )
+
+    # 2. If not in DB, discover files from the cloned local repository
+    repo_dir = (Path(settings.repository_storage_path) / str(repository_id)).resolve()
+    if not repo_dir.exists() or not repo_dir.is_dir():
+        return RepositoryFilesResponse(
+            repository_id=repository_id,
+            total_files=0,
+            files=[],
+        )
+
+    discovered = discover_repository_files(
+        repo_dir,
+        max_file_size_bytes=settings.max_file_size_bytes,
+    )
+    return RepositoryFilesResponse(
+        repository_id=repository_id,
+        total_files=len(discovered),
+        files=[
+            FileMetadata(
+                path=f.relative_path,
+                size_bytes=f.size_bytes,
+                extension=f.extension,
+            )
+            for f in discovered
+        ],
+    )
+
+
+@router.get(
+    "/{repository_id}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Read content of a repository file",
+    description="Reads and returns text content, line count, and size for a specific repository file.",
+)
+async def read_repository_file(
+    repository_id: UUID,
+    file_path: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> FileContentResponse:
+    repo = await db.get(Repository, repository_id)
+    if repo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository with ID '{repository_id}' not found.",
+        )
+
+    clean_path = file_path.strip()
+    if not clean_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File path must not be empty.",
+        )
+
+    raw_path_obj = Path(clean_path)
+
+    # Reject absolute paths or Windows drive letters
+    if clean_path.startswith(("/", "\\")) or raw_path_obj.is_absolute() or raw_path_obj.drive:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Absolute paths are forbidden: '{clean_path}'",
+        )
+
+    # Reject directory traversal
+    if any(part in ("..", "~") for part in raw_path_obj.parts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Directory traversal detected in path: '{clean_path}'",
+        )
+
+    repo_root = (Path(settings.repository_storage_path) / str(repository_id)).resolve()
+    if not repo_root.exists() or not repo_root.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cloned repository files are not available on server.",
+        )
+
+    target_file = (repo_root / clean_path).resolve()
+
+    if not target_file.is_relative_to(repo_root):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Path escapes repository root: '{clean_path}'",
+        )
+
+    if not target_file.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: '{clean_path}'",
+        )
+
+    if not target_file.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Path is not a regular file: '{clean_path}'",
+        )
+
+    file_size = target_file.stat().st_size
+    if file_size > settings.max_file_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File '{clean_path}' exceeds maximum allowable size of {settings.max_file_size_bytes} bytes.",
+        )
+
+    try:
+        content = target_file.read_text(encoding="utf-8", errors="replace")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read file '{clean_path}': {exc}",
+        ) from exc
+
+    lines = content.splitlines()
+    rel_posix_path = target_file.relative_to(repo_root).as_posix()
+
+    return FileContentResponse(
+        repository_id=repository_id,
+        path=rel_posix_path,
+        total_lines=len(lines),
+        size_bytes=file_size,
+        content=content,
+    )
 
 
 # ===========================================================================

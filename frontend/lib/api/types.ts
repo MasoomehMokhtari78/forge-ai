@@ -37,3 +37,23 @@ export interface IndexingResponse {
 export interface ApiError {
   detail: string;
 }
+
+export interface FileMetadata {
+  path: string;
+  size_bytes: number;
+  extension: string;
+}
+
+export interface RepositoryFilesResponse {
+  repository_id: string;
+  total_files: number;
+  files: FileMetadata[];
+}
+
+export interface FileContentResponse {
+  repository_id: string;
+  path: string;
+  total_lines: number;
+  size_bytes: number;
+  content: string;
+}
