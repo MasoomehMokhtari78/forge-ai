@@ -37,3 +37,29 @@ class RepositoryResponse(BaseModel):
     ingested_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FileMetadata(BaseModel):
+    """Metadata for a source code file within a repository."""
+
+    path: str = Field(description="Normalized POSIX relative path from repository root")
+    size_bytes: int = Field(description="File size in bytes")
+    extension: str = Field(description="File extension with leading dot")
+
+
+class RepositoryFilesResponse(BaseModel):
+    """Response containing the list of files in a repository."""
+
+    repository_id: UUID
+    total_files: int
+    files: list[FileMetadata]
+
+
+class FileContentResponse(BaseModel):
+    """Response containing the complete text content of a file."""
+
+    repository_id: UUID
+    path: str
+    total_lines: int
+    size_bytes: int
+    content: str

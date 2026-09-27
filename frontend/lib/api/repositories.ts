@@ -1,5 +1,12 @@
 import { apiClient } from "./client";
-import type { Repository, RepositoryCreate, IndexSummary, IndexingResponse } from "./types";
+import type {
+  Repository,
+  RepositoryCreate,
+  IndexSummary,
+  IndexingResponse,
+  RepositoryFilesResponse,
+  FileContentResponse,
+} from "./types";
 
 export const repositoriesApi = {
   /**
@@ -37,4 +44,24 @@ export const repositoriesApi = {
    */
   getIndexSummary: (id: string): Promise<IndexSummary> =>
     apiClient.get<IndexSummary>(`/repositories/${id}/index`),
+
+  /**
+   * List all files in the repository.
+   */
+  getFiles: (id: string): Promise<RepositoryFilesResponse> =>
+    apiClient.get<RepositoryFilesResponse>(`/repositories/${id}/files`),
+
+  /**
+   * Get content and metadata for a specific file in the repository.
+   */
+  getFileContent: (id: string, filePath: string): Promise<FileContentResponse> => {
+    const cleanPath = filePath.replace(/^\/+/, "");
+    // Encode individual path segments to handle spaces or special characters, but preserve slashes
+    const encodedPath = cleanPath
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    return apiClient.get<FileContentResponse>(`/repositories/${id}/files/${encodedPath}`);
+  },
 };
+

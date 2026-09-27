@@ -17,11 +17,13 @@ test.describe("Repository Workspace", () => {
     await expect(page.getByText(realRepoId)).toBeVisible();
 
     // Index statistics (real data: 316 files, 413 chunks)
-    await expect(page.getByText("316")).toBeVisible();
-    await expect(page.getByText("413")).toBeVisible();
+    const overview = page.getByTestId("workspace-overview");
+    await expect(overview.getByText("316")).toBeVisible();
+    await expect(overview.getByText("413")).toBeVisible();
 
     // Workspace panels
-    await expect(page.getByText("File browser coming in the next phase.")).toBeVisible();
+    await expect(page.getByTestId("workspace-file-sidebar")).toBeVisible();
+    await expect(page.getByPlaceholder("Search files...")).toBeVisible();
     await expect(page.getByText("AI Assistant", { exact: false })).toBeVisible();
   });
 

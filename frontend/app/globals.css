@@ -164,3 +164,85 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Prism Syntax Highlighting — ForgeAI Dark Theme
+ */
+code[class*="language-"],
+pre[class*="language-"] {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5rem;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  tab-size: 2;
+  hyphens: none;
+  color: oklch(0.9 0 0);
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: oklch(0.55 0 0);
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: oklch(0.65 0 0);
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: oklch(0.78 0.16 65);
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: oklch(0.78 0.15 145);
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: oklch(0.75 0.12 210);
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: oklch(0.75 0.18 290);
+  font-weight: 500;
+}
+
+.token.function,
+.token.class-name {
+  color: oklch(0.8 0.15 240);
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: oklch(0.75 0.17 30);
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
