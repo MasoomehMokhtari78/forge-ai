@@ -8,6 +8,8 @@ import type {
   FileContentResponse,
   SearchRequest,
   SearchResponse,
+  ChatRequest,
+  ChatResponse,
 } from "./types";
 
 export const repositoriesApi = {
@@ -71,5 +73,11 @@ export const repositoriesApi = {
    */
   search: (id: string, payload: SearchRequest): Promise<SearchResponse> =>
     apiClient.post<SearchResponse>(`/repositories/${id}/search`, payload),
+
+  /**
+   * Ask questions about repository code using RAG.
+   */
+  chat: (id: string, payload: ChatRequest): Promise<ChatResponse> =>
+    apiClient.post<ChatResponse>(`/repositories/${id}/chat`, payload),
 };
 

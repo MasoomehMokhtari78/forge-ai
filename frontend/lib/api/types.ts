@@ -79,3 +79,20 @@ export interface SearchResponse {
   query: string;
   results: ChunkRetrievalResult[];
 }
+
+export interface Citation {
+  path: string;
+  start_line: number;
+  end_line: number;
+  file_path?: string;
+}
+
+export interface ChatRequest {
+  question: string;
+  message?: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: Citation[];
+}

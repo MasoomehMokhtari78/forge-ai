@@ -84,21 +84,42 @@ class RAGService:
         # Step 4: Generate answer text using LLMService
         answer_text = await self.llm_service.generate(prompt)
 
-        # Step 5: Programmatically extract citations solely from included_chunks
+        # Step 5: Grounding Guard & Programmatic Citations
+        # If the LLM indicates insufficient evidence or no matching context in the repository,
+        # do not attribute irrelevant chunks as citations.
+        lower_answer = answer_text.lower()
+        is_insufficient_evidence = any(
+            phrase in lower_answer
+            for phrase in (
+                "insufficient",
+                "does not contain",
+                "do not contain",
+                "no information",
+                "not enough information",
+                "couldn't find enough relevant code",
+                "could not find",
+                "unable to find",
+                "cannot find",
+                "no evidence",
+                "no relevant repository context",
+            )
+        )
+
         seen_citations: set[tuple[str, int, int]] = set()
         citations: list[Citation] = []
 
-        for chunk in context_result.included_chunks:
-            citation_key = (chunk.path, chunk.start_line, chunk.end_line)
-            if citation_key not in seen_citations:
-                seen_citations.add(citation_key)
-                citations.append(
-                    Citation(
-                        path=chunk.path,
-                        start_line=chunk.start_line,
-                        end_line=chunk.end_line,
+        if not is_insufficient_evidence and context_result.included_chunks:
+            for chunk in context_result.included_chunks:
+                citation_key = (chunk.path, chunk.start_line, chunk.end_line)
+                if citation_key not in seen_citations:
+                    seen_citations.add(citation_key)
+                    citations.append(
+                        Citation(
+                            path=chunk.path,
+                            start_line=chunk.start_line,
+                            end_line=chunk.end_line,
+                        )
                     )
-                )
 
         return ChatResponse(
             answer=answer_text,

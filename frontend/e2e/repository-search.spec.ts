@@ -5,7 +5,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   const failedRepoId = "4c844aed-5822-43f7-bf42-e53fcb2335c9"; // octocat/Spoon-Knife (failed / unindexed)
 
   test("search UI is visible in the repository workspace", async ({ page }) => {
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     // Verify search panel and primary interactive elements are visible
     const searchPanel = page.getByTestId("semantic-search-panel");
@@ -24,7 +24,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   });
 
   test("rejects empty or whitespace query on the client side", async ({ page }) => {
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     const searchInput = page.getByTestId("semantic-search-input");
     const searchButton = page.getByTestId("semantic-search-button");
@@ -50,7 +50,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
     page,
   }) => {
     test.setTimeout(60000);
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     const searchInput = page.getByTestId("semantic-search-input");
     const searchButton = page.getByTestId("semantic-search-button");
@@ -100,7 +100,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
     page,
   }) => {
     test.setTimeout(60000);
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     const searchInput = page.getByTestId("semantic-search-input");
     await searchInput.fill("portfolio layout and project showcase");
@@ -122,8 +122,8 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
     const openButton = page.getByTestId("open-result-button-0");
     await openButton.click();
 
-    // URL should be updated with ?file=... and &line=...
-    await expect(page).toHaveURL(/\?file=.+&line=\d+/);
+    // URL should be updated with ?file=... and &line=... (preserving any existing tab param)
+    await expect(page).toHaveURL(/[?&]file=.+&line=\d+/);
 
     // Code viewer must be rendered
     const codeViewer = page.getByTestId("code-viewer");
@@ -142,7 +142,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   test("displays empty state when query returns no relevant code chunks", async ({
     page,
   }) => {
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     // Intercept search endpoint to simulate zero results
     await page.route(`**/repositories/${completedRepoId}/search`, async (route) => {
@@ -170,7 +170,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   test("handles backend search error gracefully with retry capability", async ({
     page,
   }) => {
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     let shouldFail = true;
     await page.route(`**/repositories/${completedRepoId}/search`, async (route) => {
@@ -229,7 +229,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   test("renders disabled not-indexed state for unindexed repository", async ({
     page,
   }) => {
-    await page.goto(`/repositories/${failedRepoId}`);
+    await page.goto(`/repositories/${failedRepoId}?tab=search`);
 
     // Verify search panel renders not-indexed state
     const notIndexedState = page.getByTestId("search-not-indexed");
@@ -244,7 +244,7 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
   test("supports keyboard shortcut Cmd/Ctrl+K and topbar trigger to focus search input", async ({
     page,
   }) => {
-    await page.goto(`/repositories/${completedRepoId}`);
+    await page.goto(`/repositories/${completedRepoId}?tab=search`);
 
     const searchInput = page.getByTestId("semantic-search-input");
 

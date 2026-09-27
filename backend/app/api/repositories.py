@@ -495,6 +495,12 @@ async def chat_repository(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(err),
         ) from err
+    except RuntimeError as err:
+        logger.error("RAG generation error: %s", err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(err),
+        ) from err
 
 
 # ===========================================================================
