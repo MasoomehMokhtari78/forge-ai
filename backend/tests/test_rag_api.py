@@ -99,6 +99,22 @@ def test_api_search_validation_errors(client):
     assert res.status_code == 422
 
 
+def test_api_search_no_results_returns_empty_list(client, mock_retrieval_service):
+    """POST /repositories/{id}/search returns 200 with empty list when no chunks match."""
+    repo_id = uuid4()
+    mock_retrieval_service.search.return_value = []
+    fastapi_app.dependency_overrides[get_retrieval_service] = lambda: mock_retrieval_service
+
+    payload = {"query": "non-existent concept"}
+    res = client.post(f"/repositories/{repo_id}/search", json=payload)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["repository_id"] == str(repo_id)
+    assert data["query"] == "non-existent concept"
+    assert data["results"] == []
+
+
 # ===========================================================================
 # 2. /repositories/{id}/chat API Tests
 # ===========================================================================

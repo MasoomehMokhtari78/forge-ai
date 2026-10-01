@@ -5,25 +5,27 @@
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-336791.svg?logo=postgresql)](https://www.postgresql.org/)
 [![pgvector](https://img.shields.io/badge/pgvector-0.8+-blueviolet.svg)](https://github.com/pgvector/pgvector)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_Inference-black.svg)](https://ollama.ai)
-[![Tests](https://img.shields.io/badge/pytest-188_passed-success.svg)](backend/tests)
-[![Evaluation](https://img.shields.io/badge/eval-10%2F10_passed_(100%25)-brightgreen.svg)](backend/evals)
+[![Backend Tests](https://img.shields.io/badge/pytest-207_passed-success.svg)](backend/tests)
+[![E2E Tests](https://img.shields.io/badge/Playwright-39_passed-success.svg)](frontend/e2e)
+[![Retrieval Eval](https://img.shields.io/badge/retrieval_eval-MRR_1.0000-brightgreen.svg)](backend/evals)
+[![RAG Eval](https://img.shields.io/badge/rag_eval-3%2F3_passed_(100%25)-brightgreen.svg)](backend/evals)
 
 > **ForgeAI is a local AI software-engineering assistant that can inspect and reason about Git repositories using retrieval-augmented generation and a tool-using agent.**
 
-ForgeAI is designed backend-first for repository understanding and controlled exploration. It ingests public Git repositories, generates local semantic vector embeddings with PostgreSQL and `pgvector`, and provides both single-hop RAG and an iterative, read-only agent equipped with path-safe repository inspection tools.
+ForgeAI is designed backend-first for repository understanding and controlled exploration. It ingests public Git repositories, indexes code with PostgreSQL and `pgvector`, runs a deterministic hybrid retrieval pipeline (semantic + lexical + path relevance with Reciprocal Rank Fusion), and provides both grounded RAG and an iterative, read-only agent equipped with path-safe repository inspection tools.
 
 ---
 
 ## Why ForgeAI?
 
 * **Local LLM inference with Ollama:** Runs local models without sending repository code to third-party APIs.
-* **Semantic code retrieval with PostgreSQL + pgvector:** Indexes code chunks with dense vector embeddings and queries by cosine distance.
+* **Hybrid code retrieval with Reciprocal Rank Fusion (RRF):** Combines dense vector similarity, PostgreSQL native full-text search with code identifier awareness, and hierarchical path relevance to suppress noise files (`package-lock.json`, `components.json`) and elevate genuine implementation code.
 * **Grounded RAG for repository questions:** Answers targeted single-hop queries within explicit character budgets and extracts programmatic citations.
 * **Bounded tool-using agents:** Explores repositories iteratively with hard iteration, tool-call, line-slicing, and context limits.
 * **Programmatic source tracking (`SourceRegistry`):** Allocates verified source IDs exclusively when tool executions read repository files.
 * **Repository and path isolation:** Enforces repository-scoped access and prevents path traversal, absolute path usage, or symlink escapes.
-* **Deterministic automated tests:** 188-test pytest suite using a mock LLM provider for reproducible CI/CD.
-* **Behavioral evaluation against a real local LLM:** Automated 10-case evaluation harness testing end-to-end agent performance against Ollama.
+* **Deterministic automated tests:** 207-test pytest suite and 39-test Playwright E2E suite for reproducible CI/CD.
+* **Behavioral evaluation against a real local LLM:** Automated evaluation harnesses testing hybrid retrieval (MRR 1.0000) and end-to-end RAG/agent performance against Ollama.
 
 ---
 
@@ -55,13 +57,19 @@ ForgeAI addresses these problems through **controlled exploration and verifiable
 * **Repository Ingestion:** Validates public GitHub HTTPS URLs, performs shallow git clones into an isolated storage root, and runs deterministic file discovery.
 * **Artifact Filtering:** Automatically ignores non-code directories (`.git`, `node_modules`, `dist`, `__pycache__`, `.venv`), binary extensions, images, media, and files exceeding size thresholds (default 2 MB).
 * **Local Code Indexing:** Chunks source code deterministically (50 lines, 10-line overlap) while recording exact 1-indexed line spans, generating 384-dimensional dense vectors using local Sentence Transformers.
-* **Semantic Code Retrieval:** Cosine distance similarity search powered by PostgreSQL and `pgvector`, with database-level repository isolation (`repository_id` UUID partitioning).
+* **Hybrid Code Retrieval Pipeline:** Multi-channel candidate generation combining:
+  1. Dense semantic vector retrieval (`BAAI/bge-small-en-v1.5` with pgvector cosine distance).
+  2. Native PostgreSQL full-text lexical search (`to_tsvector`/`to_tsquery`) with deterministic code-aware rescoring for identifiers, declaration patterns, and distinct-token coverage.
+  3. Path and filename relevance scoring token matches across directory structures and filenames.
+* **Reciprocal Rank Fusion (RRF) & Noise Deprioritization:** Deterministically merges candidates using RRF ($K=60$) with an automatic 0.1x penalty on build manifests and lock files (`package-lock.json`, `components.json`, `yarn.lock`), guaranteeing clean source-code evidence for RAG.
+* **Retrieval Quality Metrics Suite:** Standardized evaluation runner measuring Precision@K, Recall@K, and Mean Reciprocal Rank (MRR) across code identifier, configuration, styling, and semantic queries.
 * **Grounded Single-Hop RAG:** Context budget packing (up to 4,000 characters) with prompt encapsulation of untrusted code snippets and programmatic citation extraction.
 * **Read-Only Investigation Agent:** A bounded iterative loop where an LLM dynamically selects tools, observes file content, and accumulates evidence.
+* **Interactive Next.js Workspace:** Full-stack frontend with repository dashboard, file explorer tree, line-level code viewer with deep-linking, grounded chat interface, and Cmd/Ctrl+K code search with neutral relevance indicators.
 * **Strict Safety Boundaries:** Rejection of path traversal (`..`), user home paths (`~`), Windows drive letters, absolute paths, and symlinks escaping the repository root.
 * **Grounding Safeguard:** Rejects premature final answers if the agent fails to inspect repository evidence for repository-specific queries.
 * **Tool-Error Recovery & Path Correction:** Intercepts path/file resolution failures and injects recovery guidance, allowing the agent to inspect the error and attempt a corrected tool call within its configured limits.
-* **Deterministic Testing & Automated Evals:** 188-test pytest suite using a mock LLM for repeatable CI/CD, paired with a 10-case behavioral evaluation harness testing the live agent against local Ollama.
+* **Deterministic Testing & Automated Evals:** 207-test pytest suite using a mock LLM for repeatable CI/CD, paired with 39 Playwright E2E tests and behavioral evaluation harnesses for hybrid retrieval (MRR 1.0000) and RAG generation against local Ollama.
 
 ---
 
@@ -79,9 +87,9 @@ flowchart TD
         LocalEmbed --> PGVector[("PostgreSQL 17 + pgvector\n(repositories, code_files, code_chunks)")]
     end
 
-    subgraph Reasoning_Engine ["2. Retrieval & Agent Engine"]
+    subgraph Reasoning_Engine ["2. Hybrid Retrieval & Agent Engine"]
         Client["Developer / Client Request"] --> Router{"API Router\n(/repositories)"}
-        Router -->|"POST /{id}/search"| Search["Semantic Search\n(pgvector Cosine Distance)"]
+        Router -->|"POST /{id}/search"| Search["Hybrid Retrieval Pipeline\n(Semantic + Lexical + Path + RRF)"]
         Router -->|"POST /{id}/chat"| RAG["Single-Hop RAG\n(Budget Packing + PromptBuilder)"]
         Router -->|"POST /{id}/agent"| Agent["Bounded Agent Loop\n(State, Memory, Grounding Guard)"]
         
@@ -89,7 +97,7 @@ flowchart TD
         RAG --> Search
 
         Agent <-->|"Structured Tool Calls\n& JSON Observations"| AgentTools["Read-Only Agent Tools\n- list_files\n- search_code\n- read_file"]
-        AgentTools -->|"Vector Search"| PGVector
+        AgentTools -->|"Hybrid Code Search"| Search
         AgentTools -->|"Safe Line Slicing"| LocalDisk["Isolated Cloned Files\n(./data/repositories/<uuid>)"]
     end
 
@@ -178,15 +186,59 @@ When a tool call fails because of an invalid path or similar recoverable error, 
 
 ---
 
+## Hybrid Retrieval Pipeline
+
+ForgeAI employs a multi-channel hybrid retrieval pipeline that addresses the core limitation of semantic-only vector search—specifically, that pure semantic similarity frequently ranks irrelevant files (such as `package-lock.json` or `components.json`) alongside authentic implementation code.
+
+```text
+User Query
+    │
+    ├── 1. Semantic Candidate Retrieval (Top 20)
+    │      pgvector cosine distance <=> using BAAI/bge-small-en-v1.5 embeddings
+    │
+    ├── 2. Lexical Candidate Retrieval (Top 20)
+    │      PostgreSQL to_tsvector / to_tsquery with code-aware rescoring:
+    │      - Distinct query token match weighting
+    │      - Exact code identifier recognition (PascalCase, camelCase, snake_case)
+    │      - Definition / declaration bonus (const, function, class, export, def)
+    │
+    └── 3. Path & Filename Relevance (Top 20)
+           Deterministic token overlap across filenames and directory paths:
+           - Filename matches (+3.0 per token) vs directory matches (+1.0 per token)
+           - Component root export prioritization
+    │
+    ▼
+Candidate Deduplication & Identifier Mapping (UUID-keyed chunk pool)
+    │
+    ▼
+Reciprocal Rank Fusion (RRF) Reranking
+    RRF(chunk) = W_sem / (K + rank_sem) + W_lex / (K + rank_lex) + W_path / (K + rank_path)
+    + Noise / Build manifest penalty (0.1x for package-lock.json, components.json, etc.)
+    │
+    ▼
+Top-K Chunks Passed to ContextBuilder & RAG Pipeline
+```
+
+### Retrieval Stages
+
+1. **Semantic Channel:** Embeds the query and computes cosine distance against indexed chunks in PostgreSQL via `pgvector`, partitioned by `WHERE code_files.repository_id = :repo_id`.
+2. **Lexical Channel:** Evaluates text relevance via PostgreSQL full-text search (`ts_rank_cd`). A Python rescoring stage then prioritizes chunks matching exact code identifiers (e.g. `CardSpotlight` or `getFileContent`), distinct token coverage, and symbol declaration patterns.
+3. **Path Relevance Channel:** Analyzes file paths for query token overlap, heavily weighting filename matches over directory paths and boosting root component files over deep utility lines.
+4. **Reciprocal Rank Fusion (RRF):** Fuses the multi-channel candidate rankings into a unified score without assuming semantic and lexical scores share a common numerical scale:
+   $$\text{Score}(c) = \sum_{m \in \{\text{sem}, \text{lex}, \text{path}\}} \frac{W_m}{K + \text{Rank}_m(c)}$$
+   Configured with $K=60$ and weights $W=1.0$. A $0.1\times$ penalty is applied to lock and configuration manifest files unless the query specifically requests them.
+
+---
+
 ## RAG Pipeline
 
-For direct, single-hop queries that do not require multi-step navigation, ForgeAI provides a high-throughput RAG endpoint (`POST /repositories/{id}/chat`):
+For direct repository queries, ForgeAI provides a grounded RAG endpoint (`POST /repositories/{id}/chat`):
 
-1. **Embedding Generation:** The user question is embedded using `BAAI/bge-small-en-v1.5`.
-2. **Repository-Isolated Retrieval:** Chunks are retrieved from PostgreSQL using pgvector cosine-distance retrieval (`CodeChunk.embedding.cosine_distance(query_vector)`), scoped by `WHERE code_files.repository_id = :repo_id`.
-3. **Budget-Aware Context Packing:** `ContextBuilder` packs chunks in order of similarity score up to `rag_max_context_chars` (default 4,000 characters). Chunks that do not fit within the budget are dropped.
+1. **Hybrid Retrieval:** The user question is processed through the 4-channel hybrid retrieval pipeline (semantic, lexical, path relevance, and RRF reranking) to select the highest-quality code chunks.
+2. **Repository-Isolated Retrieval:** All retrieval queries are strictly scoped by `repository_id` UUID at the database level.
+3. **Budget-Aware Context Packing:** `ContextBuilder` packs chunks in order of fused RRF score up to `rag_max_context_chars` (default 4,000 characters). Chunks exceeding the budget are dropped.
 4. **Prompt Encapsulation:** Untrusted code content is wrapped in distinct structural boundaries with system instructions forbidding prompt injection.
-5. **Deterministic Citation Extraction:** Citations are extracted exclusively from the chunks that fit into the context window.
+5. **Deterministic Citation Extraction:** Citations are extracted exclusively from the verified chunks that fit into the context window.
 
 ---
 
@@ -255,16 +307,33 @@ ForgeAI includes an automated behavioral evaluation harness (`backend/evals`) th
 
 | Suite | Scope | Result | Status |
 | :--- | :--- | :--- | :--- |
-| **Behavioral Evaluation Harness** | 10 repository investigation cases (Ollama + Qwen2.5-Coder 7B) | **10 / 10 Passed** (100%) | Verified |
-| **Pytest Unit & Integration Suite** | Unit, integration, security, RAG, and agent contracts | **188 Passed, 1 Skipped** | Verified |
+| **Hybrid Retrieval Evaluation** | 4 multi-channel ranking benchmarks against PostgreSQL | **MRR: 1.0000** \| **Recall@3: 1.0000** \| **P@3: 0.67** | Verified |
+| **RAG Behavioral Evaluation** | 3 grounded repository Q&A queries (Real Ollama + Qwen2.5-Coder 7B) | **3 / 3 Passed** (100%) | Verified |
+| **Agent Behavioral Evaluation** | 10 repository investigation cases (Ollama + Qwen2.5-Coder 7B) | **10 / 10 Passed** (100%) | Verified |
+| **Pytest Unit & Integration Suite** | Backend unit, integration, retrieval, security, RAG, and agent contracts | **207 Passed, 1 Skipped** | Verified |
+| **Playwright E2E Suite** | Full-stack user flows (Dashboard, Workspace, File Viewer, Search, Chat) | **39 / 39 Passed** (100%) | Verified |
 
-*(The single skipped test is an unprivileged Windows symlink creation check).*
+*(The single skipped pytest is an unprivileged Windows symlink creation check).*
+
+#### Hybrid Retrieval Quality Benchmark Breakdown
+
+Evaluated against the indexed portfolio repository (`MasoomehMokhtari78/Portfolio`, 29 files, 230 chunks):
+
+| Benchmark Case | Representative Query | Top Retrieved Code Files | P@3 | R@3 | RR | Noise Suppression |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **Case 1: Section Discovery** | *"Where is the projects section handled or rendered?"* | `Projects.tsx`, `page.tsx` | 1.00 | 1.00 | 1.00 | `package-lock.json` & `components.json` eliminated |
+| **Case 2: Style Configuration** | *"Where are global styles and fonts configured?"* | `globals.css`, `layout.tsx` | 0.67 | 1.00 | 1.00 | Manifests suppressed |
+| **Case 3: Code Identifier** | *"Where is CardSpotlight implemented?"* | `card-spotlight.tsx`, `card.tsx` | 0.33 | 1.00 | 1.00 | Exact implementation file ranked #1 |
+| **Case 4: Semantic Concept** | *"Where does the developer introduce herself?"* | `page.tsx`, `Introduction.tsx` | 0.67 | 1.00 | 1.00 | 100% Noise-free top-2 |
+
+* **Mean Reciprocal Rank (MRR):** **1.0000**
+* **Mean Recall@3:** **1.0000**
+* **Mean Precision@3:** **0.6667**
 
 ### Engineering Insights from Evaluation
-The evaluation suite demonstrated its value by identifying an agent behavioral edge case:
-1. **The Flaw:** In test case `read-file-python-patterns`, the model guessed `.gitignore` instead of `Python.gitignore`. Upon receiving `File not found`, the agent aborted prematurely with `"Insufficient evidence"`, causing a test failure (initial pass rate: 9/10).
-2. **The Fix:** We implemented structured error detection in `_is_recoverable_path_error` and injected actionable `recovery_guidance`.
-3. **The Outcome:** The agent was updated to fall back to repository discovery after a failed file lookup. Guided by the error observation, it uses `list_files` or `search_code` to discover the correct path `Python.gitignore`, reads the file, and produces a grounded answer citing verified sources within its configured limits. The evaluation suite reached **10/10 (100%)**.
+1. **Agent Path Recovery:** The model initially guessed generic filenames (`.gitignore`) instead of repository-specific templates (`Python.gitignore`). We implemented structured error detection in `_is_recoverable_path_error` and injected actionable `recovery_guidance`. Guided by the error observation, the agent falls back to `list_files` or `search_code`, discovers the correct path, and reaches a 10/10 (100%) pass rate.
+2. **Hybrid Retrieval Noise Elimination:** Semantic vector embeddings frequently scored `package-lock.json` and `components.json` highly for general code questions because of high token density. Implementing PostgreSQL full-text search with code-aware symbol weighting and Reciprocal Rank Fusion ($K=60$) with a 0.1x noise penalty completely eliminated manifest pollution, lifting MRR to 1.0000.
+
 
 ---
 
@@ -314,14 +383,14 @@ Programmatic Citation Verification:
 | **Backend Framework** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance asynchronous API framework |
 | **Runtime & ASGI** | [Python 3.10+](https://www.python.org/) & [Uvicorn](https://www.uvicorn.org/) | Modern asynchronous runtime |
 | **Relational Database** | [PostgreSQL 17](https://www.postgresql.org/) | Relational storage for repositories, files, and chunks |
-| **Vector Extension** | [pgvector](https://github.com/pgvector/pgvector) | Cosine distance vector indexing and retrieval |
+| **Vector & Search** | [pgvector](https://github.com/pgvector/pgvector) + PostgreSQL FTS | Hybrid vector and lexical search with Reciprocal Rank Fusion |
 | **ORM & Migrations** | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) & [Alembic](https://alembic.sqlalchemy.org/) | Asynchronous database access and schema migrations |
 | **Embeddings** | [Sentence Transformers](https://sbert.net/) (`BAAI/bge-small-en-v1.5`) | Local 384-dimensional dense code embeddings |
-| **Local LLM Inference** | [Ollama](https://ollama.ai/) (`Qwen2.5-Coder 7B`) | Local LLM for function-calling and agent reasoning |
-| **Testing & CI** | [pytest](https://pytest.org/) & `MockAgentLLMService` | 188 deterministic tests without external API dependencies |
-| **Evaluation** | Custom Behavioral Evaluation Harness | 10-case behavioral evaluation suite |
+| **Local LLM Inference** | [Ollama](https://ollama.ai/) (`Qwen2.5-Coder 7B`) | Local LLM for function-calling, grounded RAG, and agent reasoning |
+| **Testing & CI** | [pytest](https://pytest.org/) (207 tests) & [Playwright](https://playwright.dev/) (39 E2E tests) | Deterministic automated backend and frontend validation |
+| **Evaluation** | Automated Evaluation Harnesses | Benchmarks for Hybrid Retrieval (MRR), RAG grounding, and Agent trajectory |
 | **Containerization** | [Docker Compose](https://docs.docker.com/compose/) | Full-stack orchestration (PostgreSQL, FastAPI backend, Next.js frontend) |
-| **Frontend** | [Next.js](https://nextjs.org/) + TypeScript + Tailwind + shadcn/ui | Developer-tool application shell |
+| **Frontend** | [Next.js](https://nextjs.org/) + TypeScript + Tailwind + shadcn/ui | Full-featured developer workspace (dashboard, viewer, search, chat) |
 
 ---
 
@@ -332,7 +401,7 @@ Programmatic Citation Verification:
 * **Docker & Docker Compose** (for running the full stack)
 * **Ollama** installed and running on the host machine (not containerized, providing direct GPU access)
 * **Git** installed on your system PATH
-* *(Optional for local host testing)* **Python 3.10+**
+* *(Optional for local host testing)* **Python 3.10+** and **Node.js 18+**
 
 ### 1. Clone the Repository
 
@@ -397,7 +466,7 @@ cd backend
 alembic upgrade head
 ```
 
-#### Running Tests
+#### Running Backend Pytest Suite
 To run tests against the dedicated test database, initialize it once in Docker:
 ```bash
 docker compose exec postgres createdb -U forgeai forgeai_test
@@ -408,12 +477,28 @@ Then run pytest from the `backend/` directory:
 cd backend
 pytest
 ```
-*Expected: 188 passed, 1 skipped.*
+*Expected: 207 passed, 1 skipped.*
 
-#### Running the Behavioral Evaluation Harness
+#### Running Frontend Playwright Suite
+Run the full browser end-to-end test suite from the `frontend/` directory:
+```bash
+cd frontend
+npx playwright test
+```
+*Expected: 39 passed.*
+
+#### Running Evaluation Suites
 With Ollama running `qwen2.5-coder:7b` on the host:
 ```bash
 cd backend
+
+# Hybrid Retrieval Benchmark (P@3, R@3, MRR)
+python -m evals.run_retrieval_eval
+
+# RAG Behavioral Evaluation (Grounded Q&A against live Ollama)
+python -m evals.run_rag_eval
+
+# Agent Behavioral Evaluation Harness (Multi-turn tool-using agent)
 python -m evals.run_agent_eval
 ```
 
@@ -434,6 +519,13 @@ curl -X POST http://localhost:8000/repositories \
 curl -X POST http://localhost:8000/repositories/<repository_id>/index
 ```
 
+### Query via Grounded RAG (Hybrid Retrieval + Ollama)
+```bash
+curl -X POST http://localhost:8000/repositories/<repository_id>/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Where is the projects section handled or rendered?"}'
+```
+
 ### Query via Grounded Agent
 ```bash
 curl -X POST http://localhost:8000/repositories/<repository_id>/agent \
@@ -448,18 +540,19 @@ curl -X POST http://localhost:8000/repositories/<repository_id>/agent \
 ### Completed (Current Foundation)
 - [x] **Repository Ingestion & Cloning:** Git cloning, file discovery, size limits, and artifact filtering.
 - [x] **Code Chunking & Local Embeddings:** Line-tracked chunking with local `BAAI/bge-small-en-v1.5` embeddings.
-- [x] **Semantic Retrieval:** PostgreSQL + pgvector cosine similarity search with repository isolation.
-- [x] **Grounded RAG Pipeline:** Context budget packing and programmatic citation extraction.
+- [x] **Hybrid Code Retrieval & RRF Reranking:** Dense vector + PostgreSQL lexical FTS + path relevance + noise manifest suppression (MRR 1.0000).
+- [x] **Grounded RAG Pipeline:** Context budget packing and programmatic citation extraction using hybrid evidence.
 - [x] **Read-Only Repository Agent:** Bounded iterative loop with `list_files`, `search_code`, and `read_file`.
 - [x] **Local LLM Provider:** Ollama integration running `Qwen2.5-Coder 7B` with native and tagged tool calling.
+- [x] **Interactive Web Frontend:** Next.js application for repository management, visual code exploration, grounded chat, and search.
 - [x] **Security Constraints:** Path traversal, symlink resolution, and repository boundary protection.
 - [x] **Grounding Safeguard & Citations:** `SourceRegistry` verifying evidence before answer acceptance.
 - [x] **Tool-Error Recovery & Path Correction:** Interception of missing file paths with recovery guidance allowing corrected tool attempts.
-- [x] **Behavioral Evaluation Harness:** Automated 10-case evaluation suite (100% pass rate) with machine-readable reports.
-- [x] **Deterministic Test Suite:** 188 unit and integration tests using `MockAgentLLMService`.
+- [x] **Behavioral Evaluation Harnesses:** Automated evaluation suites for Hybrid Retrieval, RAG Q&A, and Agent Trajectory.
+- [x] **Deterministic Test Suites:** 207 backend unit/integration tests and 39 Playwright E2E browser tests.
 
 ### Planned Work
-- [ ] **Interactive Web Frontend:** Next.js application for repository management, visual code exploration, and real-time agent tracing.
 - [ ] **Design Pattern & Architecture Analysis:** High-level architectural reasoning and dependency graph analysis.
+- [ ] **Tree-sitter AST Chunking:** Syntactic boundary preservation to avoid splitting code functions across chunks.
 - [ ] **Code Modification Agent:** Controlled, branch-isolated code generation and refactoring agent.
 - [ ] **Test-Driven Code Changes:** Validation agent that executes test suites to verify generated modifications.

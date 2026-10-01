@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-09-28T00:05:53.835027",
+  "repository_id": "8962366c-b33a-49d9-a4e0-919384c6665b",
+  "repository_name": "MasoomehMokhtari78/Portfolio",
+  "all_passed": false,
+  "mean_reciprocal_rank": 0.6667,
+  "mean_precision_at_3": 0.5833,
+  "mean_recall_at_3": 1.0,
+  "cases": [
+    {
+      "case_id": "case-1-projects",
+      "name": "Projects Section Implementation",
+      "query": "Where is the projects section handled or rendered?",
+      "passed": true,
+      "retrieved_paths": [
+        "components/Projects/Projects.tsx",
+        "components/Projects/Projects.tsx",
+        "app/page.tsx",
+        "components/Header.tsx",
+        "README.md"
+      ],
+      "precision_at_3": 1.0,
+      "recall_at_3": 1.0,
+      "reciprocal_rank": 1.0,
+      "noise_suppressed": true
+    },
+    {
+      "case_id": "case-2-styles-fonts",
+      "name": "Global Styles and Fonts Configuration",
+      "query": "Where are global styles and fonts configured?",
+      "passed": true,
+      "retrieved_paths": [
+        "app/globals.css",
+        "app/layout.tsx",
+        "components/ui/button.tsx",
+        "components/Introduction/Introduction.tsx",
+        "components/Introduction/Introduction.tsx"
+      ],
+      "precision_at_3": 0.6667,
+      "recall_at_3": 1.0,
+      "reciprocal_rank": 1.0,
+      "noise_suppressed": true
+    },
+    {
+      "case_id": "case-3-identifier",
+      "name": "Code Identifier Discovery (CardSpotlight)",
+      "query": "Where is CardSpotlight implemented?",
+      "passed": false,
+      "retrieved_paths": [
+        "components/ui/card.tsx",
+        "components/ui/card.tsx",
+        "components/ui/card-spotlight.tsx",
+        "components/ui/card.tsx",
+        "components/Projects/Projects.tsx"
+      ],
+      "precision_at_3": 0.3333,
+      "recall_at_3": 1.0,
+      "reciprocal_rank": 0.3333,
+      "noise_suppressed": true
+    },
+    {
+      "case_id": "case-4-semantic",
+      "name": "Semantic Concept (Personal Background)",
+      "query": "author personal summary and developer background",
+      "passed": false,
+      "retrieved_paths": [
+        "components.json",
+        "app/globals.css",
+        "components/Introduction/Introduction.tsx",
+        "components/ui/button.tsx",
+        "package.json"
+      ],
+      "precision_at_3": 0.3333,
+      "recall_at_3": 1.0,
+      "reciprocal_rank": 0.3333,
+      "noise_suppressed": true
+    }
+  ]
+}

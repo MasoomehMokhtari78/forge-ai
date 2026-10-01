@@ -2,9 +2,10 @@
 Pydantic schemas for code retrieval and RAG operations.
 """
 
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from app.core.config import settings
 
@@ -64,18 +65,38 @@ class Citation(BaseModel):
     start_line: int
     end_line: int
 
+    @computed_field
+    @property
+    def file_path(self) -> str:
+        return self.path
+
     model_config = ConfigDict(frozen=True)
 
 
 class ChatRequest(BaseModel):
     """Request payload for repository code question-answering."""
 
-    question: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
+    question: str | None = Field(
+        default=None,
         description="User question regarding the repository codebase.",
     )
+    message: str | None = Field(
+        default=None,
+        description="Alternative alias for question.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_question_or_message(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            q = data.get("question") or data.get("message")
+            if not q or not isinstance(q, str) or not q.strip():
+                raise ValueError("Question or message cannot be empty.")
+            data["question"] = q.strip()
+            data["message"] = q.strip()
+        elif isinstance(data, str) and data.strip():
+            return {"question": data.strip(), "message": data.strip()}
+        return data
 
 
 class ChatResponse(BaseModel):

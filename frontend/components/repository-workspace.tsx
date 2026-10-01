@@ -13,11 +13,14 @@ import {
   Layers,
   Files,
   X,
-  Sparkles,
+  Bot,
+  Search,
 } from "lucide-react";
 import { RepositoryStatusBadge } from "@/components/repository-status-badge";
 import { FileTree } from "@/components/file-tree";
 import { CodeViewer } from "@/components/code-viewer";
+import { SemanticSearch } from "@/components/semantic-search";
+import { ChatPanel } from "@/components/chat-panel";
 import { repositoriesApi } from "@/lib/api/repositories";
 import { ApiClientError } from "@/lib/api/client";
 import type {
@@ -82,8 +85,45 @@ export function RepositoryWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Directly derive active file path from URL query param ?file=...
+  // Directly derive active file path and optional line highlight from URL query params
   const selectedFilePath = searchParams.get("file") || initialSelectedFile || null;
+  const lineParam = searchParams.get("line");
+  const targetLine = lineParam ? parseInt(lineParam, 10) : null;
+
+  // Derive active right tab directly from URL query param ("chat" by default, or "search")
+  const activeRightTab = searchParams.get("tab") === "search" ? "search" : "chat";
+
+  const handleTabChange = useCallback(
+    (newTab: "chat" | "search") => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (newTab === "search") {
+        params.set("tab", "search");
+      } else {
+        params.delete("tab");
+      }
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams]
+  );
+
+  // Global shortcut: Cmd+K / Ctrl+K switches to search and focuses search input
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        handleTabChange("search");
+        setTimeout(() => {
+          const el = document.querySelector<HTMLInputElement>(
+            '[data-testid="semantic-search-input"]'
+          );
+          el?.focus();
+          el?.select();
+        }, 50);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleTabChange]);
 
   const [fileContent, setFileContent] = useState<FileContentResponse | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState<boolean>(false);
@@ -138,9 +178,14 @@ export function RepositoryWorkspace({
   }, [selectedFilePath, repository.id]);
 
   const handleSelectFile = useCallback(
-    (path: string) => {
+    (path: string, line?: number) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("file", path);
+      if (line) {
+        params.set("line", String(line));
+      } else {
+        params.delete("line");
+      }
       router.push(`${pathname}?${params.toString()}`);
     },
     [router, pathname, searchParams]
@@ -149,6 +194,7 @@ export function RepositoryWorkspace({
   const handleCloseFile = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("file");
+    params.delete("line");
     router.push(`${pathname}?${params.toString()}`);
   }, [router, pathname, searchParams]);
 
@@ -217,7 +263,39 @@ export function RepositoryWorkspace({
           </>
         )}
 
-        <div className="ml-auto shrink-0">
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleTabChange("chat")}
+            className="hidden md:flex items-center gap-1.5 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors cursor-pointer"
+            data-testid="workspace-chat-trigger"
+            title="Chat with codebase"
+          >
+            <Bot className="size-3 text-primary" />
+            <span>Chat</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleTabChange("search");
+              setTimeout(() => {
+                const el = document.querySelector<HTMLInputElement>(
+                  '[data-testid="semantic-search-input"]'
+                );
+                el?.focus();
+                el?.select();
+              }, 50);
+            }}
+            className="hidden md:flex items-center gap-1.5 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-xs text-muted-foreground hover:border-border hover:text-foreground transition-colors cursor-pointer"
+            data-testid="workspace-search-trigger"
+            title="Search codebase (⌘K)"
+          >
+            <Search className="size-3 text-muted-foreground" />
+            <span>Search</span>
+            <kbd className="rounded border border-border/80 bg-muted/40 px-1 font-mono text-[9px]">
+              ⌘K
+            </kbd>
+          </button>
           <RepositoryStatusBadge status={repository.status} />
         </div>
       </div>
@@ -245,6 +323,7 @@ export function RepositoryWorkspace({
               isLoading={isLoadingContent}
               error={contentError}
               onRetry={handleRetry}
+              targetLine={targetLine}
             />
           ) : (
             <div className="flex flex-1 flex-col overflow-auto" data-testid="workspace-overview">
@@ -361,26 +440,56 @@ export function RepositoryWorkspace({
           )}
         </div>
 
-        {/* ── Right panel: AI Assistant placeholder ── */}
-        <aside className="hidden w-72 shrink-0 flex-col border-l border-border xl:flex">
-          <div className="flex h-11 items-center gap-2 border-b border-border px-4 bg-muted/10">
-            <span className="size-1.5 rounded-full bg-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              AI Assistant
-            </span>
+        {/* ── Right panel: AI Assistant & Semantic Search ── */}
+        <aside
+          className="w-80 lg:w-96 shrink-0 flex flex-col border-l border-border bg-sidebar/20"
+          data-testid="workspace-search-sidebar"
+        >
+          {/* Tab Navigation */}
+          <div className="flex h-10 shrink-0 items-center border-b border-border bg-muted/10 px-2 gap-1 select-none">
+            <button
+              type="button"
+              onClick={() => handleTabChange("chat")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                activeRightTab === "chat"
+                  ? "bg-card text-foreground shadow-xs border border-border/80"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              }`}
+              data-testid="tab-chat"
+            >
+              <Bot className="size-3.5 text-primary" />
+              <span>AI Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange("search")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                activeRightTab === "search"
+                  ? "bg-card text-foreground shadow-xs border border-border/80"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              }`}
+              data-testid="tab-search"
+            >
+              <Search className="size-3.5" />
+              <span>Search</span>
+            </button>
           </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-border bg-muted/40 text-primary">
-              <Sparkles className="size-5" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-foreground">
-                Coming next
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Chat with your codebase using RAG and the ForgeAI agent.
-              </p>
-            </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {activeRightTab === "chat" ? (
+              <ChatPanel
+                repositoryId={repository.id}
+                repositoryStatus={repository.status}
+                onSelectFile={handleSelectFile}
+              />
+            ) : (
+              <SemanticSearch
+                repositoryId={repository.id}
+                repositoryStatus={repository.status}
+                onSelectFile={handleSelectFile}
+              />
+            )}
           </div>
         </aside>
       </div>

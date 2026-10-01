@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import Prism from "prismjs";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-javascript";
@@ -38,6 +38,7 @@ interface CodeViewerProps {
   isLoading: boolean;
   error: string | null;
   onRetry?: () => void;
+  targetLine?: number | null;
 }
 
 interface LanguageInfo {
@@ -119,8 +120,21 @@ export function CodeViewer({
   isLoading,
   error,
   onRetry,
+  targetLine = null,
 }: CodeViewerProps) {
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (targetLine && fileData && !isLoading) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`code-line-${targetLine}`);
+        if (el) {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [targetLine, fileData, isLoading]);
 
   const langInfo = useMemo(() => {
     return filePath ? getLanguageInfo(filePath) : { prismKey: "text", label: "Text" };
@@ -276,6 +290,15 @@ export function CodeViewer({
           <Badge variant="secondary" className="text-[11px] font-mono px-2 py-0 h-6 tabular-nums hidden sm:inline-flex">
             {formatBytes(fileData.size_bytes)}
           </Badge>
+          {targetLine && (
+            <Badge
+              variant="outline"
+              className="text-[11px] font-mono px-2 py-0 h-6 border-primary/40 text-primary bg-primary/10"
+              data-testid="target-line-badge"
+            >
+              Line {targetLine}
+            </Badge>
+          )}
 
           <Button
             variant="ghost"
@@ -309,11 +332,23 @@ export function CodeViewer({
             aria-hidden="true"
             data-testid="line-numbers-gutter"
           >
-            {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i} className="h-6 leading-6 tabular-nums">
-                {i + 1}
-              </div>
-            ))}
+            {Array.from({ length: lineCount }, (_, i) => {
+              const lineNum = i + 1;
+              const isTarget = lineNum === targetLine;
+              return (
+                <div
+                  key={i}
+                  id={`code-line-${lineNum}`}
+                  className={`h-6 leading-6 tabular-nums px-1 transition-colors ${
+                    isTarget ? "bg-primary/25 text-primary font-bold rounded-xs" : ""
+                  }`}
+                  data-line-number={lineNum}
+                  data-highlighted-line={isTarget ? "true" : undefined}
+                >
+                  {lineNum}
+                </div>
+              );
+            })}
           </div>
 
           {/* Source Code Content */}

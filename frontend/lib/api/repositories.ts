@@ -6,6 +6,10 @@ import type {
   IndexingResponse,
   RepositoryFilesResponse,
   FileContentResponse,
+  SearchRequest,
+  SearchResponse,
+  ChatRequest,
+  ChatResponse,
 } from "./types";
 
 export const repositoriesApi = {
@@ -63,5 +67,17 @@ export const repositoriesApi = {
       .join("/");
     return apiClient.get<FileContentResponse>(`/repositories/${id}/files/${encodedPath}`);
   },
+
+  /**
+   * Perform semantic vector search for code chunks matching the query.
+   */
+  search: (id: string, payload: SearchRequest): Promise<SearchResponse> =>
+    apiClient.post<SearchResponse>(`/repositories/${id}/search`, payload),
+
+  /**
+   * Ask questions about repository code using RAG.
+   */
+  chat: (id: string, payload: ChatRequest): Promise<ChatResponse> =>
+    apiClient.post<ChatResponse>(`/repositories/${id}/chat`, payload),
 };
 

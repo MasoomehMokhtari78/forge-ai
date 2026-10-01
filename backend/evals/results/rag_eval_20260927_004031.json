@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-09-27T00:40:31.615719",
+  "repository_id": "8962366c-b33a-49d9-a4e0-919384c6665b",
+  "repository_name": "MasoomehMokhtari78/Portfolio",
+  "llm_provider": "ollama",
+  "model": "qwen2.5-coder:7b",
+  "all_passed": true,
+  "total_cases": 3,
+  "passed_cases": 3,
+  "cases": [
+    {
+      "case_id": "rag-projects-section",
+      "case_name": "Projects Section Implementation Discovery",
+      "passed": true,
+      "failures": [],
+      "checks": [
+        {
+          "check": "answer_min_length",
+          "passed": true,
+          "detail": "Length 245 (required >= 20)"
+        },
+        {
+          "check": "min_sources",
+          "passed": true,
+          "detail": "2 source(s) (required >= 1)"
+        },
+        {
+          "check": "expected_source_match",
+          "passed": true,
+          "detail": "Sources: ['app/page.tsx', 'package-lock.json'] matching any of ['page.tsx', 'projects']"
+        }
+      ],
+      "answer_preview": "The projects section is handled or rendered in the `app/page.tsx` file. Specifically, it is rendered within the `Home` component, inside a `div` with the `id=\"projects\"`. The `Projects` component is i...",
+      "sources_count": 2,
+      "source_files": [
+        "app/page.tsx",
+        "package-lock.json"
+      ],
+      "duration_seconds": 22.82
+    },
+    {
+      "case_id": "rag-styling-fonts",
+      "case_name": "Global Styling and Font Configuration",
+      "passed": true,
+      "failures": [],
+      "checks": [
+        {
+          "check": "answer_min_length",
+          "passed": true,
+          "detail": "Length 1503 (required >= 20)"
+        },
+        {
+          "check": "min_sources",
+          "passed": true,
+          "detail": "3 source(s) (required >= 1)"
+        },
+        {
+          "check": "expected_source_match",
+          "passed": true,
+          "detail": "Sources: ['components.json', 'app/layout.tsx', 'package-lock.json'] matching any of ['globals.css', 'layout.tsx', 'tailwind']"
+        }
+      ],
+      "answer_preview": "Global styles and fonts are configured in the `app/layout.tsx` file. Specifically:\n\n1. **Global Styles**: The `globals.css` file is imported at the beginning of the file. This file likely contains the...",
+      "sources_count": 3,
+      "source_files": [
+        "components.json",
+        "app/layout.tsx",
+        "package-lock.json"
+      ],
+      "duration_seconds": 7.72
+    },
+    {
+      "case_id": "rag-grounding-refusal",
+      "case_name": "Grounding Refusal on Unsupported Out-of-Domain Question",
+      "passed": true,
+      "failures": [],
+      "checks": [
+        {
+          "check": "max_sources",
+          "passed": true,
+          "detail": "0 source(s) (allowed <= 0)"
+        },
+        {
+          "check": "grounding_refusal",
+          "passed": true,
+          "detail": "Refusal detected: True"
+        }
+      ],
+      "answer_preview": "The provided code context does not contain any information related to quantum entanglement algorithms or relativistic warp drive calculations. The code appears to be related to a React component that ...",
+      "sources_count": 0,
+      "source_files": [],
+      "duration_seconds": 1.36
+    }
+  ]
+}
