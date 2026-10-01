@@ -85,8 +85,8 @@ test.describe("Repository Workspace - Semantic Search Vertical Slice", () => {
     // Must display line range
     await expect(firstItem).toContainText("Lines ");
 
-    // Must display similarity match badge
-    await expect(firstItem.getByText(/% match/)).toBeVisible();
+    // Must display relevance badge
+    await expect(firstItem.getByText("Relevant result")).toBeVisible();
 
     // Must display code snippet block
     const codeSnippet = firstItem.locator("pre code");

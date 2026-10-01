@@ -316,12 +316,9 @@ export function SemanticSearch({
             </div>
 
             <div className="space-y-2.5">
-              {results.map((result, idx) => {
-                const scorePercent = Math.round(result.similarity * 100);
-
-                return (
-                  <div
-                    key={result.chunk_id || idx}
+              {results.map((result, idx) => (
+                <div
+                  key={result.chunk_id || idx}
                     className="group rounded-lg border border-border/70 bg-card hover:border-primary/50 transition-all p-3 space-y-2 shadow-xs"
                     data-testid={`search-result-item-${idx}`}
                     data-search-result-item
@@ -344,10 +341,11 @@ export function SemanticSearch({
 
                       <Badge
                         variant="secondary"
-                        className="shrink-0 text-[10px] font-mono px-1.5 py-0 h-5 tabular-nums bg-primary/10 text-primary border-primary/20"
-                        title={`Cosine similarity: ${result.similarity.toFixed(4)}`}
+                        className="shrink-0 text-[10px] font-medium px-2 py-0 h-5 bg-primary/10 text-primary border-primary/20"
+                        data-testid="search-result-badge"
+                        title={`Relevance score: ${result.similarity.toFixed(4)}`}
                       >
-                        {scorePercent}% match
+                        Relevant result
                       </Badge>
                     </div>
 
@@ -372,8 +370,7 @@ export function SemanticSearch({
                       </Button>
                     </div>
                   </div>
-                );
-              })}
+                ))}
             </div>
           </div>
         ) : (
