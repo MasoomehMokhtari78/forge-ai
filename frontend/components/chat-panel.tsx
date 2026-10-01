@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { repositoriesApi } from "@/lib/api/repositories";
 import { ApiClientError } from "@/lib/api/client";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
 import type { Citation, IngestionStatus } from "@/lib/api/types";
 
 export interface ChatMessage {
@@ -292,9 +293,10 @@ export function ChatPanel({
                   ) : (
                     /* Normal assistant answer */
                     <div className="rounded-lg border border-border/80 bg-card p-3 space-y-3 shadow-xs">
-                      <div className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                        {message.content}
-                      </div>
+                      <MarkdownRenderer
+                        content={message.content}
+                        onSelectFile={onSelectFile}
+                      />
 
                       {/* Sources / Citations */}
                       {message.sources && message.sources.length > 0 && (
