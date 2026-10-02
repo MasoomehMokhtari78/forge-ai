@@ -102,3 +102,27 @@ def test_budget_too_small_for_any_content_returns_placeholder():
 
     assert result.context_text == "(No relevant code chunks found)"
     assert result.included_chunks == []
+
+
+def test_oversized_candidate_is_skipped_and_later_candidate_included():
+    """An oversized chunk exceeding remaining budget is skipped, and subsequent smaller chunks are included."""
+    builder = ContextBuilder(default_max_chars=4000)
+    chunk1 = _make_chunk(path="a.py", content="short 1")
+    huge_chunk2 = _make_chunk(path="huge.py", content="x" * 2000)
+    chunk3 = _make_chunk(path="c.py", content="short 3")
+
+    len_chunk1 = len(builder._format_chunk(1, chunk1))
+    len_chunk3 = len(builder._format_chunk(3, chunk3))
+    separator_len = len("\n\n" + ("-" * 40) + "\n\n")
+
+    # Budget fits chunk 1 and chunk 3, but cannot fit huge_chunk2
+    budget = len_chunk1 + separator_len + len_chunk3 + 20
+
+    result = builder.build(chunks=[chunk1, huge_chunk2, chunk3], max_chars=budget)
+
+    assert len(result.included_chunks) == 2
+    assert result.included_chunks[0].path == "a.py"
+    assert result.included_chunks[1].path == "c.py"
+    assert "huge.py" not in result.context_text
+    assert "[Source 1]" in result.context_text
+    assert "[Source 3]" in result.context_text
