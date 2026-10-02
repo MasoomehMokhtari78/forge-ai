@@ -28,6 +28,18 @@ from app.schemas.rag import (
     SearchRequest,
     SearchResponse,
 )
+from app.schemas.analysis import (
+    AnalysisResponse,
+    AnalysisSource,
+    CodeScope,
+    CodeScopeType,
+    KnowledgeAnalysisRequest,
+)
+from app.schemas.knowledge import (
+    KnowledgeCreate,
+    KnowledgeDocumentResponse,
+    KnowledgeResponse,
+)
 from app.schemas.repository import RepositoryCreate, RepositoryResponse
 
 __all__ = [
@@ -38,12 +50,20 @@ __all__ = [
     "AgentResponse",
     "AgentStatus",
     "AgentToolDefinition",
+    "AnalysisResponse",
+    "AnalysisSource",
     "ChatRequest",
     "ChatResponse",
     "ChunkRetrievalResult",
     "Citation",
+    "CodeScope",
+    "CodeScopeType",
     "IndexSummaryResponse",
     "IndexingResponse",
+    "KnowledgeAnalysisRequest",
+    "KnowledgeCreate",
+    "KnowledgeDocumentResponse",
+    "KnowledgeResponse",
     "ListFilesArgs",
     "ReadFileArgs",
     "RepositoryCreate",

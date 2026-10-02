@@ -26,7 +26,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import health, repositories
+from app.api import analysis, health, knowledge, repositories
 
 app = FastAPI(title=settings.project_name, version=settings.version)
 
@@ -40,6 +40,8 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(repositories.router)
+app.include_router(knowledge.router)
+app.include_router(analysis.router)
 
 if __name__ == "__main__":
     import uvicorn

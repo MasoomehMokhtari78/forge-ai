@@ -52,7 +52,7 @@ async def clean_database(test_engine):
     """Ensure all tables are truncated between tests for clean state."""
     yield
     async with test_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE TABLE repositories CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE repositories, engineering_knowledge CASCADE;"))
 
 
 

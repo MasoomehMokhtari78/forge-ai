@@ -34,7 +34,50 @@ class MockLLMService(LLMService):
     """
 
     async def generate(self, prompt: str) -> str:
-        # Check if the prompt contains context
+        # Check if this is a Knowledge-Guided Analysis prompt
+        if "## Repository Evidence" in prompt and "## Engineering Knowledge" in prompt:
+            repo_match = re.search(
+                r"## Repository Evidence\s*(.*?)\s*## Engineering Knowledge",
+                prompt,
+                re.DOTALL,
+            )
+            repo_body = repo_match.group(1).strip() if repo_match else ""
+
+            if not repo_body or "(No relevant repository code chunks found)" in repo_body:
+                return (
+                    "[MOCK LLM RESPONSE] I could not find enough relevant repository evidence to "
+                    "make a grounded recommendation about this implementation."
+                )
+
+            knowledge_match = re.search(
+                r"## Engineering Knowledge\s*(.*?)\s*## User Question",
+                prompt,
+                re.DOTALL,
+            )
+            knowledge_body = knowledge_match.group(1).strip() if knowledge_match else ""
+
+            if not knowledge_body or "(No relevant engineering knowledge found)" in knowledge_body:
+                return (
+                    "[MOCK LLM RESPONSE] The selected knowledge scope does not provide enough "
+                    "evidence to support a recommendation for this question."
+                )
+
+            question_match = re.search(r"## User Question\s*(.*?)$", prompt, re.DOTALL)
+            question = question_match.group(1).strip() if question_match else "the question"
+
+            repo_sources = re.findall(r"\[source\s+([a-zA-Z0-9_]+)\]", repo_body)
+            knowledge_sources = re.findall(r"\[source\s+([a-zA-Z0-9_]+)\]", knowledge_body)
+            all_sources = [f"[{s}]" for s in repo_sources + knowledge_sources]
+            sources_summary = ", ".join(all_sources) if all_sources else "the provided evidence"
+
+            return (
+                f"[MOCK LLM RESPONSE] Grounded Analysis:\n"
+                f"- Repository Facts: The retrieved code ({', '.join(repo_sources)}) shows the implementation.\n"
+                f"- Knowledge Facts: The engineering reference ({', '.join(knowledge_sources)}) defines matching patterns.\n"
+                f"- Recommendation: Based on {sources_summary}, the implementation aligns with the reference patterns for '{question}'."
+            )
+
+        # Standard repository RAG prompt
         context_match = re.search(
             r"=== BEGIN CODE CONTEXT ===\s*(.*?)\s*=== END CODE CONTEXT ===",
             prompt,

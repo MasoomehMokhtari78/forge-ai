@@ -29,6 +29,7 @@ class SourceRegistry:
         start_line: int,
         end_line: int,
         source_type: str,
+        label: str | None = None,
     ) -> str:
         """Register an observed code snippet and return its stable source ID."""
         key = (path, start_line, end_line)
@@ -37,12 +38,44 @@ class SourceRegistry:
 
         self._counter += 1
         source_id = f"src_{self._counter}"
+        resolved_label = label or f"{path}:{start_line}-{end_line}"
         citation = SourceCitation(
             source_id=source_id,
             path=path,
             start_line=start_line,
             end_line=end_line,
             source_type=source_type,
+            label=resolved_label,
+        )
+        self._sources[source_id] = citation
+        self._key_to_id[key] = source_id
+        return source_id
+
+    def register_knowledge(
+        self,
+        filename: str,
+        page_number: int | None = None,
+        chunk_id: UUID | None = None,
+        label: str | None = None,
+    ) -> str:
+        """Register an observed engineering knowledge snippet and return its stable source ID."""
+        key = (filename, page_number or 0, str(chunk_id) if chunk_id else "")
+        if key in self._key_to_id:
+            return self._key_to_id[key]
+
+        self._counter += 1
+        source_id = f"src_{self._counter}"
+        resolved_label = label or (
+            f"{filename}, page {page_number}" if page_number is not None else filename
+        )
+        citation = SourceCitation(
+            source_id=source_id,
+            path=filename,
+            start_line=None,
+            end_line=None,
+            source_type="knowledge",
+            page_number=page_number,
+            label=resolved_label,
         )
         self._sources[source_id] = citation
         self._key_to_id[key] = source_id

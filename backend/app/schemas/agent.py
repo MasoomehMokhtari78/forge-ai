@@ -73,9 +73,11 @@ class SourceCitation(BaseModel):
 
     source_id: str = Field(..., description="Stable source identifier (e.g. 'src_1')")
     path: str
-    start_line: int
-    end_line: int
-    source_type: str = Field(..., description="'search' or 'read'")
+    start_line: int | None = Field(default=None, description="Starting line number for code files")
+    end_line: int | None = Field(default=None, description="Ending line number for code files")
+    source_type: str = Field(..., description="'search', 'read', 'repository', or 'knowledge'")
+    page_number: int | None = Field(default=None, description="Page number for knowledge documents")
+    label: str | None = Field(default=None, description="Human-readable citation label")
 
     model_config = ConfigDict(frozen=True)
 
