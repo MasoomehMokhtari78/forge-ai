@@ -23,9 +23,10 @@ class ContextBuilder:
       1. Complete Context Budgeting:
          The character limit (max_context_chars) applies to the complete formatted string,
          including source headers, separators, line annotations, and code contents.
-      2. Complete Chunk Preservation:
+      2. Complete Chunk Preservation & Skip Packing:
          Chunks are included whole whenever they fit into the remaining budget.
-         If adding the next chunk would exceed the budget, packing terminates.
+         If adding a chunk would exceed the budget, it is skipped and subsequent chunks
+         continue to be evaluated against the remaining space.
       3. Oversized First Chunk Handling:
          If the very first chunk's formatted block exceeds the entire budget, it is
          deterministically truncated to fit within max_context_chars with an explicit marker.
@@ -103,8 +104,8 @@ class ContextBuilder:
                         fitted_block = header + truncated_content + truncation_marker
                         formatted_blocks.append(fitted_block)
                         included_chunks.append(chunk)
-                    # If budget is smaller than even header + marker, nothing fits
-                break
+                        current_len = len(fitted_block)
+                continue
 
         if not formatted_blocks:
             return ContextBuildResult(

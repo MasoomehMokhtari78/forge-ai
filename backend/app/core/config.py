@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # RAG & Retrieval configuration
     rag_top_k: int = 5
-    rag_max_context_chars: int = 4000
+    rag_max_context_chars: int = 8000
     retrieval_semantic_candidates: int = 20
     retrieval_lexical_candidates: int = 20
     retrieval_path_candidates: int = 20
@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     rrf_weight_semantic: float = 1.0
     rrf_weight_lexical: float = 1.0
     rrf_weight_path: float = 1.0
+    retrieval_noise_penalty: float = 0.1
+    retrieval_test_penalty: float = 0.3
+    retrieval_doc_penalty: float = 0.4
 
     # Agent configuration
     agent_max_iterations: int = 8

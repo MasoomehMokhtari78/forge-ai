@@ -52,6 +52,42 @@ NOISE_FILE_PATTERNS: tuple[str, ...] = (
     "tsconfig.tsbuildinfo",
 )
 
+TEST_INTENT_KEYWORDS: set[str] = {
+    "test", "tests", "testing", "spec", "specs", "coverage",
+    "pytest", "playwright", "mock", "mocks", "benchmark", "benchmarks", "eval", "evals",
+}
+
+DOC_INTENT_KEYWORDS: set[str] = {
+    "readme", "doc", "docs", "documentation", "guide", "manual",
+}
+
+
+def is_test_file(path: str) -> bool:
+    """Determine whether a file path belongs to tests, fixtures, or evaluations."""
+    p = path.lower().replace("\\", "/")
+    parts = p.split("/")
+    if any(part in ("tests", "test", "__tests__", "e2e", "evals") for part in parts):
+        return True
+    filename = parts[-1]
+    if (
+        filename.startswith("test_")
+        or filename.endswith("_test.py")
+        or ".test." in filename
+        or ".spec." in filename
+    ):
+        return True
+    return False
+
+
+def is_doc_file(path: str) -> bool:
+    """Determine whether a file path belongs to documentation or general readmes."""
+    p = path.lower().replace("\\", "/")
+    parts = p.split("/")
+    filename = parts[-1]
+    if filename.startswith("readme") or any(part in ("docs", "doc") for part in parts):
+        return True
+    return False
+
 
 def extract_query_tokens(query: str) -> list[str]:
     """Extract code-relevant keywords and identifiers from a user query.
@@ -302,8 +338,14 @@ class RetrievalService:
         weight_semantic: float = settings.rrf_weight_semantic,
         weight_lexical: float = settings.rrf_weight_lexical,
         weight_path: float = settings.rrf_weight_path,
+        query: str | None = None,
     ) -> list[ChunkRetrievalResult]:
         """Combine multi-channel candidate lists using Reciprocal Rank Fusion (RRF)."""
+        # Determine query intent for conditional artifact deprioritization
+        query_words = set(re.findall(r"[a-z0-9_]+", query.lower())) if query else set()
+        has_test_intent = bool(query_words & TEST_INTENT_KEYWORDS)
+        has_doc_intent = bool(query_words & DOC_INTENT_KEYWORDS)
+
         # Build rank lookups (1-indexed)
         sem_ranks: dict[UUID, int] = {chunk.id: idx + 1 for idx, (chunk, _, _) in enumerate(semantic_candidates)}
         lex_ranks: dict[UUID, int] = {chunk.id: idx + 1 for idx, (chunk, _, _) in enumerate(lexical_candidates)}
@@ -330,11 +372,17 @@ class RetrievalService:
 
             total_score = s_contrib + l_contrib + p_contrib
 
-            # Apply deprioritization penalty to lock files and config manifests
-            # so authentic source code files take precedence
+            # Apply artifact-aware deprioritization penalties:
+            # 1. Lock files / build manifests always receive noise penalty
+            # 2. Test / e2e files receive test penalty UNLESS query explicitly asks for tests
+            # 3. Documentation / README files receive doc penalty UNLESS query explicitly asks for docs
             path_lower = path.lower()
             if any(term in path_lower for term in NOISE_FILE_PATTERNS):
-                total_score *= 0.1
+                total_score *= settings.retrieval_noise_penalty
+            elif not has_test_intent and is_test_file(path):
+                total_score *= settings.retrieval_test_penalty
+            elif not has_doc_intent and is_doc_file(path):
+                total_score *= settings.retrieval_doc_penalty
 
             scores[cid] = total_score
 
@@ -446,4 +494,5 @@ class RetrievalService:
             path_candidates=path_candidates,
             top_k=top_k,
             similarity_threshold=similarity_threshold,
+            query=clean_query,
         )

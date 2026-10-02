@@ -128,6 +128,80 @@ def test_fuse_and_rerank_deprioritizes_lock_files():
     assert results[0].similarity > results[1].similarity
 
 
+def test_fuse_and_rerank_deprioritizes_tests_and_docs_for_architecture_query():
+    retrieval_service = RetrievalService(embedding_service=MockEmbeddingService())
+
+    cid_code = uuid4()
+    chunk_code = CodeChunk(
+        id=cid_code, file_id=uuid4(), chunk_index=0,
+        content="def ingest(): pass", start_line=1, end_line=10, embedding=[]
+    )
+    cid_test = uuid4()
+    chunk_test = CodeChunk(
+        id=cid_test, file_id=uuid4(), chunk_index=0,
+        content="def test_ingest(): pass", start_line=1, end_line=10, embedding=[]
+    )
+    cid_doc = uuid4()
+    chunk_doc = CodeChunk(
+        id=cid_doc, file_id=uuid4(), chunk_index=0,
+        content="# Ingestion Architecture", start_line=1, end_line=10, embedding=[]
+    )
+
+    # All three appear with test and doc slightly ahead in semantic search
+    semantic_candidates = [
+        (chunk_test, "tests/test_ingestion.py", 0.95),
+        (chunk_doc, "README.md", 0.92),
+        (chunk_code, "app/services/ingestion.py", 0.88),
+    ]
+
+    # Query without test or doc keywords
+    results = retrieval_service.fuse_and_rerank(
+        semantic_candidates=semantic_candidates,
+        lexical_candidates=[],
+        path_candidates=[],
+        top_k=5,
+        query="Trace repository ingestion lifecycle",
+    )
+
+    assert len(results) == 3
+    # Production code chunk must be elevated above tests and documentation
+    assert results[0].path == "app/services/ingestion.py"
+
+
+def test_fuse_and_rerank_preserves_tests_when_query_has_test_intent():
+    retrieval_service = RetrievalService(embedding_service=MockEmbeddingService())
+
+    cid_code = uuid4()
+    chunk_code = CodeChunk(
+        id=cid_code, file_id=uuid4(), chunk_index=0,
+        content="def ingest(): pass", start_line=1, end_line=10, embedding=[]
+    )
+    cid_test = uuid4()
+    chunk_test = CodeChunk(
+        id=cid_test, file_id=uuid4(), chunk_index=0,
+        content="def test_ingest(): pass", start_line=1, end_line=10, embedding=[]
+    )
+
+    semantic_candidates = [
+        (chunk_test, "tests/test_ingestion.py", 0.95),
+        (chunk_code, "app/services/ingestion.py", 0.90),
+    ]
+
+    # Query explicitly asks for tests
+    results = retrieval_service.fuse_and_rerank(
+        semantic_candidates=semantic_candidates,
+        lexical_candidates=[],
+        path_candidates=[],
+        top_k=5,
+        query="What tests cover repository ingestion?",
+    )
+
+    assert len(results) == 2
+    # Test chunk keeps its top rank because query has test intent
+    assert results[0].path == "tests/test_ingestion.py"
+    assert results[1].path == "app/services/ingestion.py"
+
+
 # ===========================================================================
 # 4. Deterministic Integration Tests with Database Fixtures
 # ===========================================================================
