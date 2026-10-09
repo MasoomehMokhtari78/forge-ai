@@ -10,8 +10,8 @@ class Settings(BaseSettings):
 
     # Repository storage & cloning
     repository_storage_path: str = "./data/repositories"
-    git_clone_timeout: int = 120
-    max_file_size_bytes: int = 2 * 1024 * 1024
+    max_file_size_bytes: int = 100 * 1024 * 1024
+    max_knowledge_file_size_bytes: int = 500 * 1024 * 1024
 
     # Local code indexing & embeddings
     embedding_model: str = "BAAI/bge-small-en-v1.5"

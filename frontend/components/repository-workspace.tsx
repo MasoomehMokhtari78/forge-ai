@@ -15,12 +15,14 @@ import {
   X,
   Bot,
   Search,
+  BookOpen,
 } from "lucide-react";
 import { RepositoryStatusBadge } from "@/components/repository-status-badge";
 import { FileTree } from "@/components/file-tree";
 import { CodeViewer } from "@/components/code-viewer";
 import { SemanticSearch } from "@/components/semantic-search";
 import { ChatPanel } from "@/components/chat-panel";
+import { KnowledgeAnalysisPanel } from "@/components/knowledge-analysis-panel";
 import { repositoriesApi } from "@/lib/api/repositories";
 import { ApiClientError } from "@/lib/api/client";
 import type {
@@ -90,16 +92,18 @@ export function RepositoryWorkspace({
   const lineParam = searchParams.get("line");
   const targetLine = lineParam ? parseInt(lineParam, 10) : null;
 
-  // Derive active right tab directly from URL query param ("chat" by default, or "search")
-  const activeRightTab = searchParams.get("tab") === "search" ? "search" : "chat";
+  // Derive active right tab directly from URL query param ("chat" by default, or "search", or "analysis")
+  const rawTab = searchParams.get("tab");
+  const activeRightTab: "chat" | "search" | "analysis" =
+    rawTab === "search" ? "search" : rawTab === "analysis" ? "analysis" : "chat";
 
   const handleTabChange = useCallback(
-    (newTab: "chat" | "search") => {
+    (newTab: "chat" | "search" | "analysis") => {
       const params = new URLSearchParams(searchParams.toString());
-      if (newTab === "search") {
-        params.set("tab", "search");
-      } else {
+      if (newTab === "chat") {
         params.delete("tab");
+      } else {
+        params.set("tab", newTab);
       }
       router.push(`${pathname}?${params.toString()}`);
     },
@@ -473,6 +477,19 @@ export function RepositoryWorkspace({
               <Search className="size-3.5" />
               <span>Search</span>
             </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange("analysis")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                activeRightTab === "analysis"
+                  ? "bg-card text-foreground shadow-xs border border-border/80"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              }`}
+              data-testid="tab-analysis"
+            >
+              <BookOpen className="size-3.5 text-primary" />
+              <span>Analysis</span>
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -483,10 +500,17 @@ export function RepositoryWorkspace({
                 repositoryStatus={repository.status}
                 onSelectFile={handleSelectFile}
               />
-            ) : (
+            ) : activeRightTab === "search" ? (
               <SemanticSearch
                 repositoryId={repository.id}
                 repositoryStatus={repository.status}
+                onSelectFile={handleSelectFile}
+              />
+            ) : (
+              <KnowledgeAnalysisPanel
+                repository={repository}
+                files={initialFiles}
+                activeFilePath={selectedFilePath}
                 onSelectFile={handleSelectFile}
               />
             )}

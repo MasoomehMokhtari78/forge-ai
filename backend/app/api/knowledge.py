@@ -201,12 +201,15 @@ async def upload_document(
             detail=f"Failed to read uploaded file: {exc}",
         ) from exc
 
-    if len(content) > settings.max_file_size_bytes:
+    max_allowed = settings.max_knowledge_file_size_bytes
+    if len(content) > max_allowed:
+        max_mb = max_allowed // (1024 * 1024)
+        actual_mb = len(content) / (1024 * 1024)
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=(
-                f"File size ({len(content)} bytes) exceeds the maximum allowed limit "
-                f"of {settings.max_file_size_bytes} bytes."
+                f"File size ({actual_mb:.1f} MB) exceeds the maximum allowed limit "
+                f"of {max_mb} MB."
             ),
         )
 
