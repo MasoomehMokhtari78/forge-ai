@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderGit2, Settings, LayoutDashboard } from "lucide-react";
+import { FolderGit2, Settings, LayoutDashboard, BookOpen } from "lucide-react";
 import { cn } from "cn";
 
 import {
@@ -29,6 +29,11 @@ const mainNav = [
     href: "/repositories",
     label: "Repositories",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/knowledge",
+    label: "Knowledge",
+    icon: BookOpen,
   },
 ];
 

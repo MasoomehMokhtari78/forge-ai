@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-02T20:21:47.447777",
+  "timestamp": "2026-10-01T23:10:40.631297",
   "repository_id": "8962366c-b33a-49d9-a4e0-919384c6665b",
   "repository_name": "MasoomehMokhtari78/Portfolio",
   "all_passed": true,
@@ -33,7 +33,7 @@
         "app/globals.css",
         "app/layout.tsx",
         "components/ui/button.tsx",
-        "components/Introduction/Introduction.tsx",
+        "README.md",
         "components/Introduction/Introduction.tsx"
       ],
       "precision_at_3": 0.6667,

@@ -96,3 +96,65 @@ export interface ChatResponse {
   answer: string;
   sources: Citation[];
 }
+
+export type KnowledgeStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface KnowledgeCreate {
+  name: string;
+  description?: string | null;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  knowledge_id: string;
+  filename: string;
+  source_type: string;
+  file_size_bytes: number;
+  status: KnowledgeStatus;
+  error_message: string | null;
+  chunks_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EngineeringKnowledge {
+  id: string;
+  name: string;
+  description: string | null;
+  status: KnowledgeStatus;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  documents: KnowledgeDocument[];
+}
+
+export type CodeScopeType = "repository" | "file";
+
+export interface CodeScope {
+  type: CodeScopeType;
+  path?: string | null;
+}
+
+export interface KnowledgeAnalysisRequest {
+  repository_id: string;
+  knowledge_id: string;
+  code_scope: CodeScope;
+  question: string;
+  top_k_repo?: number;
+  top_k_knowledge?: number;
+}
+
+export interface AnalysisSource {
+  source_id: string;
+  type: "repository" | "knowledge";
+  label: string;
+  path: string;
+  start_line?: number | null;
+  end_line?: number | null;
+  page_number?: number | null;
+}
+
+export interface AnalysisResponse {
+  answer: string;
+  sources: AnalysisSource[];
+}

@@ -62,7 +62,7 @@ class DiscoveredFile:
 
 def discover_repository_files(
     repo_root: Path,
-    max_file_size_bytes: int = 2 * 1024 * 1024,
+    max_file_size_bytes: int = 100 * 1024 * 1024,
 ) -> list[DiscoveredFile]:
     """Recursively discover and filter files in a repository directory.
 
